@@ -1,0 +1,14 @@
+CHANGES
+1) //Autoload "benchmark2M" waveform
+	1.1)	file cmdman.c modified. Changes at "AGB NOV15"
+	1.2)	Comment with // line 71: #define AUTO_LOAD_APP for Auto Load
+	1.3)	Uncomment line 71: #define AUTO_LOAD_APP for Normal APP load		
+	
+
+
+
+
+2) Use ./stop_runcf.sh to kill all daemons. Please, do it after finishing every execution.
+
+
+Please, use ctrl-Z to stop execution

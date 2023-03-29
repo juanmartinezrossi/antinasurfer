@@ -1,0 +1,141 @@
+#                                               -*- Autoconf -*-
+# Process this file with autoconf to produce a configure script.
+
+AC_PREREQ([2.69])
+AC_INIT([FULL-PACKAGE-NAME], [VERSION], [BUG-REPORT-ADDRESS])
+AC_CONFIG_SRCDIR([sw_api/src/skeletonExt.c])
+AC_CONFIG_HEADERS([config.h])
+
+# Checks for programs.
+AC_PROG_CXX
+AC_PROG_CC
+AC_PROG_INSTALL
+AC_PROG_MAKE_SET
+
+# Checks for libraries.
+# FIXME: Replace `main' with a function in `-lAnalysis_Mb':
+AC_CHECK_LIB([Analysis_Mb], [main])
+# FIXME: Replace `main' with a function in `-lFicl_Mb':
+AC_CHECK_LIB([Ficl_Mb], [main])
+# FIXME: Replace `main' with a function in `-lFramework_Con':
+AC_CHECK_LIB([Framework_Con], [main])
+# FIXME: Replace `main' with a function in `-lFramework_Mb':
+AC_CHECK_LIB([Framework_Mb], [main])
+# FIXME: Replace `main' with a function in `-lHardware_Mb':
+AC_CHECK_LIB([Hardware_Mb], [main])
+# FIXME: Replace `main' with a function in `-lOs_Mb':
+AC_CHECK_LIB([Os_Mb], [main])
+# FIXME: Replace `main' with a function in `-lPci_Mb':
+AC_CHECK_LIB([Pci_Mb], [main])
+# FIXME: Replace `main' with a function in `-lUtility_Mb':
+AC_CHECK_LIB([Utility_Mb], [main])
+# FIXME: Replace `main' with a function in `-lboost_thread':
+AC_CHECK_LIB([boost_thread], [main])
+# FIXME: Replace `main' with a function in `-lcmdman_backend':
+AC_CHECK_LIB([cmdman_backend], [main])
+# FIXME: Replace `main' with a function in `-lcrm_api':
+AC_CHECK_LIB([crm_api], [main])
+# FIXME: Replace `main' with a function in `-ldl':
+AC_CHECK_LIB([dl], [main])
+# FIXME: Replace `main' with a function in `-lfftw3':
+AC_CHECK_LIB([fftw3], [main])
+# FIXME: Replace `main' with a function in `-lfiletools':
+AC_CHECK_LIB([filetools], [main])
+# FIXME: Replace `main' with a function in `-lhistory':
+AC_CHECK_LIB([history], [main])
+# FIXME: Replace `main' with a function in `-lhw_api':
+AC_CHECK_LIB([hw_api], [main])
+# FIXME: Replace `main' with a function in `-ljack':
+AC_CHECK_LIB([jack], [main])
+# FIXME: Replace `main' with a function in `-lm':
+AC_CHECK_LIB([m], [main])
+# FIXME: Replace `main' with a function in `-lpthread':
+AC_CHECK_LIB([pthread], [main])
+# FIXME: Replace `main' with a function in `-lreadline':
+AC_CHECK_LIB([readline], [main])
+# FIXME: Replace `main' with a function in `-lrt':
+AC_CHECK_LIB([rt], [main])
+# FIXME: Replace `main' with a function in `-lskeleton':
+AC_CHECK_LIB([skeleton], [main])
+# FIXME: Replace `main' with a function in `-lsw_api':
+AC_CHECK_LIB([sw_api], [main])
+# FIXME: Replace `main' with a function in `-lswd_common':
+AC_CHECK_LIB([swd_common], [main])
+# FIXME: Replace `main' with a function in `-ltermcap':
+AC_CHECK_LIB([termcap], [main])
+# FIXME: Replace `main' with a function in `-ltypetools':
+AC_CHECK_LIB([typetools], [main])
+# FIXME: Replace `main' with a function in `-luhd':
+AC_CHECK_LIB([uhd], [main])
+# FIXME: Replace `main' with a function in `-lutils':
+AC_CHECK_LIB([utils], [main])
+# FIXME: Replace `main' with a function in `-lwdapi':
+AC_CHECK_LIB([wdapi], [main])
+
+# Checks for header files.
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h float.h netdb.h netinet/in.h stddef.h stdint.h stdlib.h string.h strings.h sys/socket.h sys/time.h unistd.h])
+
+# Checks for typedefs, structures, and compiler characteristics.
+AC_CHECK_HEADER_STDBOOL
+AC_C_INLINE
+AC_TYPE_MODE_T
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT64_T
+
+# Checks for library functions.
+AC_FUNC_ERROR_AT_LINE
+AC_FUNC_FORK
+AC_FUNC_MALLOC
+AC_FUNC_REALLOC
+AC_FUNC_STRTOD
+AC_CHECK_FUNCS([atexit bzero clock_gettime gettimeofday inet_ntoa memset mkdir pow socket sqrt strchr strdup strstr strtoul])
+
+AC_CONFIG_FILES([MYutils/lnx_make/Makefile
+                 Makefile
+                 aloeSKs/aloeSK15/aloeplot/lnx_make/Makefile
+                 aloeSKs/aloeSK15/skel_SK15/lnx_make/Makefile
+                 cmdman_console/Makefile
+                 hw_api/lnx/Makefile
+                 modules/DAC_JACK0/lnx_make/Makefile
+                 modules/DAC_USRP/debug_make/Makefile
+                 modules/DAC_USRP/lnx_make/Makefile
+                 modules/LTE_bitInterleaver/lnx_make/Makefile
+                 modules/channel_noise/debug_make/Makefile
+                 modules/channel_noise/lnx_make/Makefile
+                 modules/dac_tx/lnx_make/Makefile
+                 modules/data_source/debug_make/Makefile
+                 modules/data_source/lnx_make/Makefile
+                 modules/data_source_sink/debug_make/Makefile
+                 modules/data_source_sink/lnx_make/Makefile
+                 modules/fft_ifft/debug_make/Makefile
+                 modules/fft_ifft/lnx_make/Makefile
+                 modules/gen9SK_CRC/lnx_make/Makefile
+                 modules/gen9SK_cyclic/lnx_make/Makefile
+                 modules/gen9SK_ifft/lnx_make/Makefile
+                 modules/gen_binsource/lnx_make/Makefile
+                 modules/gen_crc/lnx_make/Makefile
+                 modules/gen_interleaver/lnx_make/Makefile
+                 modules/gen_sink/lnx_make/Makefile
+                 modules/gen_symbolmapper/lnx_make/Makefile
+                 modules/module_template/debug_make/Makefile
+                 modules/module_template/lnx_make/Makefile
+                 modules/module_template2/debug_make/Makefile
+                 modules/module_template2/lnx_make/Makefile
+                 modules/moduloP1/debug_make/Makefile
+                 modules/moduloP1/lnx_make/Makefile
+                 modules/sink_graph/debug_make/Makefile
+                 modules/sink_graph/lnx_make/Makefile
+                 modules/sink_plot/debug_make/Makefile
+                 modules/sink_plot/lnx_make/Makefile
+                 modules/test2outputs/debug_make/Makefile
+                 modules/test2outputs/lnx_make/Makefile
+                 modules/typetools/lnx_make/Makefile
+                 modules/utran_turbocoder/lnx_make/Makefile
+                 modules/utran_turbodecoder/lnx_make/Makefile
+                 sw_api/lnx_make/Makefile
+                 sw_daemons/lnx_make/Makefile
+                 utils/lnx_make/Makefile])
+AC_CONFIG_SUBDIRS([scripts])
+AC_OUTPUT

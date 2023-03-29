@@ -1,0 +1,13 @@
+#!/bin/bash
+
+
+#DIRS=`find -name "bin"`
+
+#for DIR in $DIRS
+#do
+#cp $DIR/* /usr/local/bin
+#done
+cp hw_api/lnx/bin/* /usr/local/bin
+cp sw_daemons/lnx_make/bin/* /usr/local/bin
+cp hw_api/lnx/cfg/* /usr/local/etc/
+cp cmdman_console/bin/cmdman /usr/local/bin

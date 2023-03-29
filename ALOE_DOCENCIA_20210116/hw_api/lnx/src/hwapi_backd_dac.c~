@@ -1,0 +1,111 @@
+/** dac management front-end*/
+
+#include <stdio.h>
+#include <errno.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <signal.h>
+#include "phal_hw_api.h"
+#include "hwapi_backd.h"
+#include "dac_api.h"
+
+
+struct dac_interface *my_dac;
+
+extern pid_t dac_pid;
+
+extern struct hw_api_db *hw_api_db;
+
+void dac_sig_int(int sig, siginfo_t * sinfl, void *v);
+
+void dac_drives_kernel() {
+	sem_post(&hw_api_db->sem_dac);
+}
+void kernel_drives_dac() {
+
+	sem_wait(&hw_api_db->sem_dac);
+}
+
+int configure_dac (struct dac_interface *dac_itf, struct dac_cfg *dac, int *tslot_len_ptr)
+{
+	int n;
+	int freq;
+	sigset_t set;
+	struct sigaction action;
+	void (*sync_fnc) (void);
+
+	my_dac=dac_itf;
+	
+	printf("Configure DAC\n");
+/*	printf("hwapi_backd_dac.c->configure_dac():DAC=%s, p_readcfg=%u, p_init=%u, p_close=%u\n", 
+					dac_itf->name, dac_itf->readcfg, dac_itf->init, dac_itf->close);
+*/
+	if ((dac_pid=fork())==-1) {
+		perror("fork");
+		exit(0);
+	}
+//printf("hwapi_backd_dac.c->configure_dac().fork:dac_pid=%d\n",dac_pid); 
+	if (dac_pid>0)
+		return 1;
+
+	/* set priority and cpu-id */
+	set_realtime(getpid(),hw_api_db->kernel_dac_prio,hw_api_db->kernel_dac_cpuid);
+
+	/* capture SIGINT and SIGTERM signal */
+	action.sa_sigaction = dac_sig_int;
+	action.sa_flags = SA_SIGINFO;
+	sigemptyset(&action.sa_mask);
+	if (sigaction(SIGINT, &action, NULL) < 0) {
+		perror("sigaction");
+		return 0;
+	}
+	if (sigaction(SIGTERM, &action, NULL) < 0) {
+		perror("sigaction");
+		return 0;
+	}
+//printf("hwapi_backd_dac.c->configure_dac().readcfg(OUTPUT)0=%d\n",n); 
+	n=my_dac->readcfg(dac);
+//printf("hwapi_backd_dac.c->configure_dac().readcfg(OUTPUT)1=%d\n",n); 
+	if (n<0) {
+		printf("Error reading dac config. Errno=%d\n",n);
+		return 0;
+	}
+
+	if (hw_api_db->dac_drives_clock) {
+		printf("hwapi_backd_dac.c->configure_dac():dac_drives_kernel\n"); 
+		sync_fnc=dac_drives_kernel;
+	} else {
+		printf("hwapi_backd_dac.c->configure_dac():kernel_drives_dac\n");
+		sync_fnc=kernel_drives_dac;
+	}
+//printf("hwapi_backd_dac.c->configure_dac().init(OUTPUT) IN =%d\n",n); 
+//printf("hwapi_backd_dac.c->configure_dac(): dac->dacoutbuff[0][0]=0x%.12X\n", &dac->dacoutbuff[0][0]);
+//printf("hwapi_backd_dac.c->configure_dac(): dac->dacinbuff[0][0]=0x%.12X\n", &dac->dacinbuff[0][0]);
+	if ((n=my_dac->init(dac,tslot_len_ptr,sync_fnc))<0) {
+		printf("Error configuring dac. Errno=%d\n",n);
+		return 0;
+	}
+//printf("hwapi_backd_dac.c->configure_dac().init(OUTPUT) OUT =%d\n",n); 
+	printf("hwapi_backd_dac.c->configure_dac(): sem_init():output=%d\n", sem_init(&hw_api_db->sem_dac,1,1));
+	sigemptyset(&set);
+	sigsuspend(&set);
+	exit(0);
+}
+
+void dac_sig_int(int sig, siginfo_t * sinfl, void *v) {
+	printf("Closing DAC\n");
+	my_dac->close();
+	exit(0);
+}
+
+void close_dac()
+{
+	if (!hw_api_db->dac_drives_clock) {
+		sem_post(&hw_api_db->sem_dac);
+	}
+	my_dac->close();
+}
+
+

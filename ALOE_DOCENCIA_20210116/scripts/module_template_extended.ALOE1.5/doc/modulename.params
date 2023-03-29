@@ -1,0 +1,95 @@
+
+
+# default input length for all interfaces, in number of samples.
+# value=0 receives all data
+parameter {
+	name = input_length
+	value = 0
+}
+
+
+############ ALOE DATA TYPES #############
+# 0: bitstream
+# 1: 8-bit signed integer
+# 2: 16-bit signed integer
+# 3: 32-bit signed integer
+# 4: 32-bit floating point 
+# 17: 1 byte = 1 bit 
+
+# default input transport data type. 
+parameter {
+	name = input_datatype
+	value = 3
+}
+
+# default output transport data type. 
+parameter {
+	name = output_datatype
+	value = 3
+}
+
+
+
+# default input gain
+# multiplies input samples with a constant
+parameter {
+	name = input_gain
+	value = 1
+}
+
+# default output gain
+# multiplies output samples with a constant
+parameter {
+	name = output_gain
+	value = 1
+}
+
+
+# all the previous variables can be specified for a specific interface, 
+# by adding the "_itfNum" prefix to the variable. 
+# The default value will be replaced, for instance if we need different
+# transport types, packet sizes or gains.
+# For example, 'input_gain_0' variable sets the gain for input interface 0 
+#
+#parameter {
+#	name = input_gain_0
+#	value = 10
+#}
+
+
+################# PRINTING VARIABLES ####################
+#define NOPRINT        	0b0000=0 	/** Non printing choice*/
+#define DATARECEIVED   	0b0001=1 	/** Printing received data according specified type*/
+#define PROCESS_IN	0b0010=2	/** Printing processing data in according specified type*/
+#define PROCESS_OUT	0b0100=4	/** Printing processing data out according specified type*/
+#define DATASENT	0b1000=8	/** Printing sent data out according specified type*/
+
+parameter {
+	name = print
+	value = 0
+}
+### Number of printed data columns format
+parameter {
+	name = printncolums
+	value = 32
+}
+### Initial Printing Time-slot 
+parameter {
+	name = TS2print
+	value = 0
+}
+### Number of printing Time-slots 
+parameter {
+	name = NumTS2print
+	value = 10
+}
+### Pointer offset to print 
+parameter {
+	name = offset
+	value = 0
+}
+### Maximum number of samples to print 
+parameter {
+	name = maxlen
+	value = 32
+}

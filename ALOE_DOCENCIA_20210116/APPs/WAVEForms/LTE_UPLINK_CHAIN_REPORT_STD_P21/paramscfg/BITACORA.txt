@@ -1,0 +1,13 @@
+
+# AFEGIR a REPORT
+
+1) Througput real   FET
+2) Duracion Timeslot  FET
+3) DSSRoundTripDelay     FET
+4) EVMRoundTripDelay		FET
+5) EVM_TXsideReceivedSamples FET
+6) DATASOURSINKsentBytes	FET
+7) EVM_TXDataPeriod FET
+
+
+# Eliminar de REPORT

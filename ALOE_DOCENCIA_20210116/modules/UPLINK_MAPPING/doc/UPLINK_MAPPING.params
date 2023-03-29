@@ -1,0 +1,23 @@
+#------------------------------------------------------------------
+#dataPeriod: Define the period of a perdiodicall ask for data to 
+#            data_source_sink module.
+parameter {
+	name = dataPeriod
+	value = 7
+}
+#------------------------------------------------------------------
+# delayTOask: Define the number of time slots to wait before 
+# 			  initiating the periodic call for data.
+parameter {
+	name = delayTOask
+	value = 1
+}
+#------------------------------------------------------------------
+# NofDataSampl2ask: Define the number of bytes to ask.
+parameter {
+	name = NofDataSampl2ask
+	value = 201
+}
+
+
+

@@ -1,0 +1,27 @@
+################################ opMODE
+#define MODULATE					0
+#define HARD_DEMODULATE		1
+#define SOFT_DEMODULATE		2
+
+parameter {
+	name = opMODE
+	value = 2
+}
+################################ modulation
+#define M_BPSK						0
+#define M_4QAM						1
+#define M_16QAM						2
+#define M_64QAM						3
+parameter {
+	name = modulation
+	value = 2
+}
+################################ debugg
+#define NO DEBUGG					0
+#define DEBUGG						1
+parameter {
+	name = debugg
+	value = 0
+}
+
+

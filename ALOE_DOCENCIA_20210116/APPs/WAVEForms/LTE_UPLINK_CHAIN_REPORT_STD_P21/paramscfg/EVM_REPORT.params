@@ -1,0 +1,20 @@
+#------------------------------------------------------------------
+#opMODE=0; 						//O: BYPASSS, 1: EVM TEST&REPORT
+parameter {
+	name = opMODE
+	value = 1
+}
+#------------------------------------------------------------------
+#debugg; 						//O: No debugg, 1: debugg
+parameter {
+	name = debugg
+	value = 0
+}
+#------------------------------------------------------------------
+# Standalone: 0-No report in standalone mode, 1-Report
+parameter {
+	name = Standalone
+	value = 0
+}
+#------------------------------------------------------------------
+

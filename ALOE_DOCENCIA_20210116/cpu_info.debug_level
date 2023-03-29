@@ -1,0 +1,476 @@
+hw_api/lnx/src/hwapi_backd.c~:	hw_api_db->net_db.net_chld = 0;
+hw_api/lnx/src/hwapi_backd.c~:	if (hw_api_db->net_db.nof_ext_itf) {
+hw_api/lnx/src/hwapi_backd.c~:		Net_thread(hw_api_db, hw_api_db->data_msg_id);
+hw_api/lnx/src/hwapi_backd.c~://	printf("hw_api_db->dac_itf=%s\n", hw_api_db->dac_itf);
+hw_api/lnx/src/hwapi_backd.c~:	if (hw_api_db->dac_itf != NULL) {
+hw_api/lnx/src/hwapi_backd.c~:		if (!configure_dac(hw_api_db->dac_itf, &hw_api_db->dac, &hw_api_db->cpu_info.tslen_usec)) {
+hw_api/lnx/src/hwapi_backd.c~:	if (!hw_api_db->cpu_info.tslen_usec) {
+hw_api/lnx/src/hwapi_backd.c~:		printf("KERNEL:\tTime slot duration set to %d usec\n", hw_api_db->cpu_info.tslen_usec);
+hw_api/lnx/src/hwapi_backd.c~:	if (!set_realtime(0, hw_api_db->kernel_prio, hw_api_db->kernel_cpuid)) {
+hw_api/lnx/src/hwapi_backd.c~:	hw_api_db->runph_pid = runph_pid;
+hw_api/lnx/src/hwapi_backd.c~:	//hw_api_db->runph_grp=getpgrp();
+hw_api/lnx/src/hwapi_backd_cmds.c:		set_realtime(getpid(),hw_api_db->kernel_cmd_prio,hw_api_db->kernel_cmd_cpuid);
+hw_api/lnx/src/hwapi_backd_cmds.c:	api_msg_id=hw_api_db->api_msg_id;
+hw_api/lnx/src/hwapi_backd_cmds.c:	struct net_db *net_db=&hw_api_db->net_db;
+hw_api/lnx/src/hwapi_backd_cmds.c:		while (j < MAX_INT_ITF && hw_api_db->int_itf[j].key_id
+hw_api/lnx/src/hwapi_backd_cmds.c:			hw_api_db->int_itf[j].network_pid = net_db->ext_itf[i].pid;
+hw_api/lnx/src/hwapi_backd_cmds.c:			hw_api_db->int_itf[j].network_bpid = net_db->ext_itf[i].bpid;
+hw_api/lnx/src/hwapi_backd_mem.c:			if (hw_api_db->int_itf[i].id) {
+hw_api/lnx/src/hwapi_backd_mem.c:				if (msgctl(hw_api_db->int_itf[i].id, IPC_RMID, NULL) == -1) {
+hw_api/lnx/src/hwapi_backd_mem.c:					printf("error removing msg itf id %d\n", hw_api_db->int_itf[i].id);
+hw_api/lnx/src/hwapi_backd_mem.c:		if (sem_destroy(&hw_api_db->sem_dac)) {
+hw_api/lnx/src/hwapi_backd_mem.c:		if (sem_destroy(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_backd_mem.c:		if (sem_destroy(&hw_api_db->sem_status)) {
+hw_api/lnx/src/hwapi_backd_mem.c:			if (sem_destroy(&hw_api_db->sem_daemons[i])) {
+hw_api/lnx/src/hwapi_backd_mem.c:		for (j = 0; j < hw_api_db->cpu_info.nof_cores; j++) {
+hw_api/lnx/src/hwapi_backd_mem.c:				if (sem_destroy(&hw_api_db->sem_objects[j][i])) {
+hw_api/lnx/src/hwapi_backd_mem.c:			printf("error removing msg itf id %d\n", hw_api_db->int_itf[i].id);
+hw_api/lnx/src/hwapi_backd_mem.c:			printf("error removing msg itf id %d\n", hw_api_db->int_itf[i].id);
+hw_api/lnx/src/hwapi_backd_mem.c:	hw_api_db->int_itf[0].key_id = HW_API_MSG_KEY;
+hw_api/lnx/src/hwapi_backd_mem.c:	hw_api_db->int_itf[1].key_id = DATA_MSG_KEY;
+hw_api/lnx/src/hwapi_backd_mem.c:	hw_api_db->data_msg_id=data_msg_id;
+hw_api/lnx/src/hwapi_backd_mem.c:	hw_api_db->api_msg_id=api_msg_id;
+hw_api/lnx/src/hwapi_backd_mem.c:	if (sem_init(&hw_api_db->sem_dac,1,1)) {
+hw_api/lnx/src/hwapi_backd_mem.c:	if (sem_init(&hw_api_db->sem_var,1,1)) {
+hw_api/lnx/src/hwapi_backd_mem.c:	if (sem_init(&hw_api_db->sem_status,1,1)) {
+hw_api/lnx/src/hwapi_backd_mem.c:		if (sem_init(&hw_api_db->sem_daemons[i],1,1)) {
+hw_api/lnx/src/hwapi_backd_mem.c:	for (j = 0; j < hw_api_db->cpu_info.nof_cores; j++) {
+hw_api/lnx/src/hwapi_backd_mem.c:			if (sem_init(&hw_api_db->sem_objects[j][i],1,1)) {
+hw_api/lnx/src/hwapi_backd_mem.c:	if (!mem_new(hw_api_db->var_table, VAR_TABLE_SZ, 32)) {
+hw_api/lnx/src/hwapi_backd_mem.c:	get_time(&hw_api_db->time.init_time);
+hw_api/lnx/src/hwapi_backd_mem.c:	hw_api_db->cpu_info.disable_logs = 1;
+hw_api/lnx/src/hwapi_backd_dac.c:	sem_post(&hw_api_db->sem_dac);
+hw_api/lnx/src/hwapi_backd_dac.c:	sem_wait(&hw_api_db->sem_dac);
+hw_api/lnx/src/hwapi_backd_dac.c:	set_realtime(getpid(),hw_api_db->kernel_dac_prio,hw_api_db->kernel_dac_cpuid);
+hw_api/lnx/src/hwapi_backd_dac.c:	if (hw_api_db->dac_drives_clock) {
+hw_api/lnx/src/hwapi_backd_dac.c:	printf("hwapi_backd_dac.c->configure_dac(): sem_init():output=%d\n", sem_init(&hw_api_db->sem_dac,1,1));
+hw_api/lnx/src/hwapi_backd_dac.c:	if (!hw_api_db->dac_drives_clock) {
+hw_api/lnx/src/hwapi_backd_dac.c:		sem_post(&hw_api_db->sem_dac);
+hw_api/lnx/src/hwapi_linux_dac.c:	return hw_api_db->dac.sampleType;
+hw_api/lnx/src/hwapi_linux_dac.c:	return hw_api_db->dac.inputFreq;
+hw_api/lnx/src/hwapi_linux_dac.c:	return hw_api_db->dac.outputFreq;
+hw_api/lnx/src/hwapi_linux_dac.c:	hw_api_db->dac.inputFreq=freq;
+hw_api/lnx/src/hwapi_linux_dac.c:	hw_api_db->dac.outputFreq=freq;
+hw_api/lnx/src/hwapi_linux_dac.c:    hw_api_db->dac.NsamplesIn=nSamples;
+hw_api/lnx/src/hwapi_linux_dac.c:    hw_api_db->dac.NsamplesOut=nSamples;
+hw_api/lnx/src/hwapi_linux_dac.c:    return hw_api_db->dac.NsamplesIn;
+hw_api/lnx/src/hwapi_linux_dac.c:    return hw_api_db->dac.NsamplesOut;
+hw_api/lnx/src/hwapi_linux_dac.c:	if (channel<0 || channel>hw_api_db->dac.nof_channels) {
+hw_api/lnx/src/hwapi_linux_dac.c:    return hw_api_db->dac.dacoutbuff[channel];
+hw_api/lnx/src/hwapi_linux_dac.c:	if (channel<0 || channel>hw_api_db->dac.nof_channels) {
+hw_api/lnx/src/hwapi_linux_dac.c:    return hw_api_db->dac.dacinbuff[channel];
+hw_api/lnx/src/hwapi_linux_var.c~:    if (sem_wait(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c~:    offset = mem_alloc(hw_api_db->var_table, size);
+hw_api/lnx/src/hwapi_linux_var.c~:        if (sem_post(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c~:        if (sem_post(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c~:    if (i+1>hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c~:    	hw_api_db->max_var_id=i+1;
+hw_api/lnx/src/hwapi_linux_var.c~:    if (sem_post(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c~:	if (sem_post(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c~:	 if (sem_wait(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c~:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c~:    if (sem_wait(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c~:        mem_free(hw_api_db->var_table, var_db[stat_id].table_offset);
+hw_api/lnx/src/hwapi_linux_var.c~:    if (sem_post(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c~:    if (stat_id+1==hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c~:    	for (i=hw_api_db->max_var_id;i>=0;i--) {
+hw_api/lnx/src/hwapi_linux_var.c~:    			hw_api_db->max_var_id=i+1;
+hw_api/lnx/src/hwapi_linux_var.c~:    if (sem_wait(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c~:    for (i = 1; i < hw_api_db->max_var_id && k < nof_elems; i++) {
+hw_api/lnx/src/hwapi_linux_var.c~:    if (sem_post(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c~:	return hw_api_db->max_var_id;
+hw_api/lnx/src/hwapi_linux_var.c~:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c~:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c~:        printf("HWAPI: Error reading stat: Invalid var id %d, process %d (nof stats=%d)\n",stat_id,getpid(),hw_api_db->max_var_id);
+hw_api/lnx/src/hwapi_linux_var.c~:    mem_cpy((mem_o) hw_api_db->var_table, value, var_db[stat_id].table_offset + hw_api_db->var_table, len);
+hw_api/lnx/src/hwapi_linux_var.c~:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c~:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c~:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c~:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c~:    mem_cpy((mem_o) hw_api_db->var_table, var_db[stat_id].table_offset + hw_api_db->var_table, value, len);
+hw_api/lnx/src/hwapi_linux_var.c~:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_backd_processes.c:		if (prio>hw_api_db->kernel_prio && pid!=hw_api_db->exec_pid) {
+hw_api/lnx/src/hwapi_backd_processes.c:			printf("HWAPI_BACKD: WARNING! Trying to set a priority higher than kernel priority for process %d. Increase kernel priority (%d)\n",pid,hw_api_db->kernel_prio);
+hw_api/lnx/src/hwapi_backd_processes.c:			prio=hw_api_db->kernel_prio-1;
+hw_api/lnx/src/hwapi_backd_processes.c:	exe_name=rindex(hw_api_db->proc_db[i].path,'/');
+hw_api/lnx/src/hwapi_backd_processes.c:		exe_name = hw_api_db->proc_db[i].path;
+hw_api/lnx/src/hwapi_backd_processes.c:	x=strdup(hw_api_db->valgrind_objects);
+hw_api/lnx/src/hwapi_backd_processes.c:		hw_api_db->proc_db[i].pid = getpid();
+hw_api/lnx/src/hwapi_backd_processes.c:			execlp(VALGRIND_CMD,VALGRIND_CMD,valgrind_tool,hw_api_db->proc_db[i].path, NULL);
+hw_api/lnx/src/hwapi_backd_processes.c:			execl(hw_api_db->proc_db[i].path, hw_api_db->proc_db[i].path, NULL);
+hw_api/lnx/src/hwapi_backd_processes.c:		printf("HWAPI_BACKD: Error while launching process %s\n", hw_api_db->proc_db[i].path);
+hw_api/lnx/src/hwapi_backd_processes.c:		hw_api_db->proc_db[i].prio = hw_api_db->obj_prio;
+hw_api/lnx/src/hwapi_backd_processes.c:		hw_api_db->proc_db[i].sem_idx = hw_api_db->proc_db[i].exec_position;
+hw_api/lnx/src/hwapi_backd_processes.c:		core_id = hw_api_db->core_mapping[hw_api_db->proc_db[i].core_idx];
+hw_api/lnx/src/hwapi_backd_processes.c:		if (hw_api_db->proc_db[i].sem_idx>hw_api_db->last_semidx[hw_api_db->proc_db[i].core_idx]) {
+hw_api/lnx/src/hwapi_backd_processes.c:			hw_api_db->last_semidx[hw_api_db->proc_db[i].core_idx]=hw_api_db->proc_db[i].sem_idx;
+hw_api/lnx/src/hwapi_backd_processes.c:		set_realtime(pid, hw_api_db->proc_db[i].prio, core_id);
+hw_api/lnx/src/hwapi_backd_processes.c:	sem_i=hw_api_db->proc_db[i].sem_idx+1;
+hw_api/lnx/src/hwapi_backd_processes.c:	while(sem_i<=hw_api_db->last_semidx[hw_api_db->proc_db[i].core_idx]) {
+hw_api/lnx/src/hwapi_backd_processes.c:			if (hw_api_db->proc_db[j].core_idx == hw_api_db->proc_db[i].core_idx
+hw_api/lnx/src/hwapi_backd_processes.c:				&& hw_api_db->proc_db[j].sem_idx == sem_i) {
+hw_api/lnx/src/hwapi_backd_processes.c:				hw_api_db->proc_db[j].sem_idx--;
+hw_api/lnx/src/hwapi_backd_processes.c:				sem_post(&hw_api_db->sem_objects[hw_api_db->proc_db[i].core_idx][sem_i]);
+hw_api/lnx/src/hwapi_backd_processes.c:	hw_api_db->last_semidx[hw_api_db->proc_db[i].core_idx]--;
+hw_api/lnx/src/hwapi_backd_processes.c:		if (hw_api_db->daemons[i].runnable) {
+hw_api/lnx/src/hwapi_backd_processes.c:			hw_api_db->nof_daemons=j;
+hw_api/lnx/src/hwapi_backd_processes.c:				x = strdup(hw_api_db->daemons[i].path);
+hw_api/lnx/src/hwapi_backd_processes.c:				if (strstr(hw_api_db->daemons[i].path, "cmdman")) {
+hw_api/lnx/src/hwapi_backd_processes.c:					sprintf(hw_api_db->daemons[i].path,
+hw_api/lnx/src/hwapi_backd_processes.c:					sprintf(hw_api_db->daemons[i].path,
+hw_api/lnx/src/hwapi_backd_processes.c:				set_realtime(getpid(), hw_api_db->daemons[i].prio, hw_api_db->daemons[i].cpuid);
+hw_api/lnx/src/hwapi_backd_processes.c:				if (strstr(hw_api_db->daemons[i].path, "exec")) {
+hw_api/lnx/src/hwapi_backd_processes.c:					hw_api_db->exec_pid = getpid();
+hw_api/lnx/src/hwapi_backd_processes.c:					hw_api_db->exec_prio = hw_api_db->daemons[i].prio;
+hw_api/lnx/src/hwapi_backd_processes.c:				hw_api_db->daemons[i].pid = getpid();
+hw_api/lnx/src/hwapi_backd_processes.c:				if (hw_api_db->daemons[i].valgrind && valgrind) {
+hw_api/lnx/src/hwapi_backd_processes.c:					execlp(VALGRIND_CMD,VALGRIND_CMD,valgrind_arg,hw_api_db->daemons[i].path, NULL);
+hw_api/lnx/src/hwapi_backd_processes.c:					if (strstr(hw_api_db->daemons[i].path,"cmdman") && hw_api_db->run_as_daemon) {
+hw_api/lnx/src/hwapi_backd_processes.c:						execlp(hw_api_db->daemons[i].path, hw_api_db->daemons[i].path, "-l","-d", NULL);
+hw_api/lnx/src/hwapi_backd_processes.c:						execlp(hw_api_db->daemons[i].path, hw_api_db->daemons[i].path, NULL);
+hw_api/lnx/src/hwapi_backd_processes.c:				printf("\nHWAPI_BACKD: Error launching %s\n\n", hw_api_db->daemons[i].path);
+hw_api/lnx/src/hwapi_backd_processes.c:				hw_api_db->daemons[i].pid = 0;
+hw_api/lnx/src/hwapi_backd_processes.c:		if (hw_api_db->proc_db[i].pid > 0) {
+hw_api/lnx/src/hwapi_backd_processes.c:			error += kill_child(&hw_api_db->proc_db[i].pid, sleep_time, hw_api_db->proc_db[i].obj_name);
+hw_api/lnx/src/hwapi_backd_processes.c:		if (hw_api_db->daemons[i].pid > 0) {
+hw_api/lnx/src/hwapi_backd_processes.c:			error += kill_child(&hw_api_db->daemons[i].pid, sleep_time, hw_api_db->daemons[i].path);
+hw_api/lnx/src/hwapi_backd_processes.c:	if (hw_api_db->net_db.net_chld > 0) {
+hw_api/lnx/src/hwapi_backd_processes.c:		error += kill_child(&hw_api_db->net_db.net_chld, sleep_time, "Network Main");
+hw_api/lnx/src/hwapi_backd_processes.c:		for (i = 0; i < hw_api_db->net_db.nof_ext_itf; i++) {
+hw_api/lnx/src/hwapi_backd_processes.c:			if (hw_api_db->net_db.ext_itf[i].pid > 0) {
+hw_api/lnx/src/hwapi_backd_processes.c:				error += kill_child(&hw_api_db->net_db.ext_itf[i].pid, sleep_time, "Interface");
+hw_api/lnx/src/hwapi_backd_processes.c:			if (hw_api_db->net_db.ext_itf[i].bpid > 0) {
+hw_api/lnx/src/hwapi_backd_processes.c:				error += kill_child(&hw_api_db->net_db.ext_itf[i].bpid, sleep_time, "Interface");
+hw_api/lnx/src/hwapi_backd_processes.c:			if (!strncmp(hw_api_db->proc_db[i].path,
+hw_api/lnx/src/hwapi_backd_processes.c:					hw_api_db->proc_db[j].path, SYSTEM_STR_MAX_LEN)) {
+hw_api/lnx/src/hwapi_backd_processes.c:		if (remove(hw_api_db->proc_db[i].path)) {
+hw_api/lnx/src/hwapi_backd_processes.c:	hw_api_db->proc_db[i].path[0] = '\0';
+hw_api/lnx/src/hwapi_backd_processes.c:		if (hw_api_db->proc_db[i].path[0] != '\0') {
+hw_api/lnx/src/hwapi_backd_signals.c~:	struct net_db *net_db=&hw_api_db->net_db;
+hw_api/lnx/src/hwapi_backd_signals.c~:		if (hw_api_db->daemons[i].pid) {
+hw_api/lnx/src/hwapi_backd_signals.c~:			if (waitpid(hw_api_db->daemons[i].pid, NULL, WNOHANG) > 0) {
+hw_api/lnx/src/hwapi_backd_signals.c~:					printf(	"\033[1;31m HWAPI_BACKD: Fatal error. Daemon %s died (pid %d). Should exit...\033[0m\n", hw_api_db->daemons[i].path,hw_api_db->daemons[i].pid);
+hw_api/lnx/src/hwapi_backd_signals.c~:				hw_api_db->daemons[i].pid = 0;
+hw_api/lnx/src/hwapi_backd_signals.c~:		if (hw_api_db->proc_db[i].pid) {
+hw_api/lnx/src/hwapi_backd_signals.c~:			if (waitpid(hw_api_db->proc_db[i].pid, NULL, WNOHANG) > 0) {
+hw_api/lnx/src/hwapi_backd_signals.c~:				if (die_silent && hw_api_db->proc_db[i].status.cur_status != 6
+hw_api/lnx/src/hwapi_backd_signals.c~:						&& hw_api_db->proc_db[i].status.cur_status != 7
+hw_api/lnx/src/hwapi_backd_signals.c~:						&& !hw_api_db->proc_db[i].rt_fault) {
+hw_api/lnx/src/hwapi_backd_signals.c~:							hw_api_db->proc_db[i].obj_name,
+hw_api/lnx/src/hwapi_backd_signals.c~:							hw_api_db->proc_db[i].obj_id, (int) t.tv_sec,
+hw_api/lnx/src/hwapi_backd_signals.c~:							(int) t.tv_usec, hw_api_db->proc_db[i].cur_tstamp,
+hw_api/lnx/src/hwapi_backd_signals.c~:							hw_api_db->proc_db[i].status.cur_status);
+hw_api/lnx/src/hwapi_backd_signals.c~:				hw_api_db->proc_db[i].pid = 0;
+hw_api/lnx/src/hwapi_linux_time.c:    timersub(&tact, &hw_api_db->time.init_time, t);
+hw_api/lnx/src/hwapi_linux_time.c:	return hw_api_db->cpu_info.tslen_usec-x->tv_usec+hw_api_db->time.slotinit.tv_usec;
+hw_api/lnx/src/hwapi_linux_time.c:    timersub(&tact, t, &hw_api_db->time.init_time);
+hw_api/lnx/src/hwapi_linux_time.c:	return hw_api_db->sync_drives_clock;
+hw_api/lnx/src/hwapi_linux_time.c:	hw_api_db->time.new_tstamp=tstamp;
+hw_api/lnx/src/hwapi_linux_time.c:	hw_api_db->time.next_ts=usec;
+hw_api/lnx/src/hwapi_linux_time.c:	hw_api_db->time.new_tstamp=tstamp;
+hw_api/lnx/src/hwapi_linux_time.c:	hw_api_db->time.next_ts=0;
+hw_api/lnx/src/hwapi_linux_time.c:	sem_post(&hw_api_db->sem_dac);
+hw_api/lnx/src/hwapi_linux_time.c:    return hw_api_db->sync_ts;
+hw_api/lnx/src/hwapi_linux_time.c:    hw_api_db->time.init_time.tv_sec = x.tv_sec;
+hw_api/lnx/src/hwapi_linux_time.c:    hw_api_db->time.init_time.tv_usec = x.tv_nsec/1000;
+hw_api/lnx/src/hwapi_linux_time.c:        ts_len = &hw_api_db->cpu_info.tslen_usec;
+hw_api/lnx/src/hwapi_linux_time.c:        ts_len = &hw_api_db->cpu_info.tslen_usec;
+hw_api/lnx/src/hwapi_linux_time.c:    return (int) hw_api_db->time.tslot;
+hw_api/lnx/src/hwapi_backd_exec.c~:	for (i=0;i<hw_api_db->cpu_info.nof_cores;i++) {
+hw_api/lnx/src/hwapi_backd_exec.c~:		sem_post(&hw_api_db->sem_objects[i][0]);
+hw_api/lnx/src/hwapi_backd_exec.c~:	for (i=0;i<hw_api_db->nof_sem_daemons;i++) {
+hw_api/lnx/src/hwapi_backd_exec.c~:		sem_post(&hw_api_db->sem_daemons[i]);
+hw_api/lnx/src/hwapi_backd_exec.c~:		if (hw_api_db->period_tasks[i].fnc) {
+hw_api/lnx/src/hwapi_backd_exec.c~:			hw_api_db->period_tasks[i].cnt++;
+hw_api/lnx/src/hwapi_backd_exec.c~:			if (hw_api_db->period_tasks[i].cnt==hw_api_db->period_tasks[i].period) {
+hw_api/lnx/src/hwapi_backd_exec.c~:				sigqueue(hw_api_db->period_tasks[i].pid,SIG_PROC_CMD,val);
+hw_api/lnx/src/hwapi_backd_exec.c~:				hw_api_db->period_tasks[i].cnt=0;
+hw_api/lnx/src/hwapi_backd_exec.c~:if(hw_api_db->time.tslot == 150000){
+hw_api/lnx/src/hwapi_backd_exec.c~:	printf("1500000: hw_api_db->proc_db[i].status.cur_status=%d = 3?\n", hw_api_db->proc_db[i].status.cur_status);	
+hw_api/lnx/src/hwapi_backd_exec.c~:	printf("hw_api_db->cpu_info.debug_level=%d\n", hw_api_db->cpu_info.debug_level);	
+hw_api/lnx/src/hwapi_backd_exec.c~:	printf("hw_api_db->proc_db[i].relinquished=%d\n", hw_api_db->proc_db[i].relinquished);
+hw_api/lnx/src/hwapi_backd_exec.c~:	printf("hw_api_db->time.tslot=%d\n", hw_api_db->time.tslot);
+hw_api/lnx/src/hwapi_backd_exec.c~:	i=hw_api_db->max_proc_id-1;
+hw_api/lnx/src/hwapi_backd_exec.c~:	if (hw_api_db->proc_db[i].status.cur_status == PHAL_STATUS_RUN
+hw_api/lnx/src/hwapi_backd_exec.c~:		&& !hw_api_db->cpu_info.debug_level && !hw_api_db->proc_db[i].relinquished) {
+hw_api/lnx/src/hwapi_backd_exec.c~:/*		modinfo_msg("______________________________Tslot=%d",hw_api_db->time.tslot);
+hw_api/lnx/src/hwapi_backd_exec.c~:		printf("hw_api_db->proc_db[i].status.cur_status=%d = 3?\n", hw_api_db->proc_db[i].status.cur_status);	
+hw_api/lnx/src/hwapi_backd_exec.c~:		printf("!hw_api_db->cpu_info.debug_level=%d\n", !hw_api_db->cpu_info.debug_level);	
+hw_api/lnx/src/hwapi_backd_exec.c~:		printf("!hw_api_db->proc_db[i].relinquished=%d\n", !hw_api_db->proc_db[i].relinquished);	
+hw_api/lnx/src/hwapi_backd_exec.c~:		printf("[%d]:\tRT-Fault first object still executing (obj ts: %d)\n",hw_api_db->time.tslot,hw_api_db->proc_db[i].cur_tstamp);
+hw_api/lnx/src/hwapi_backd_exec.c~:	if (!hw_api_db->cpu_info.debug_level) {
+hw_api/lnx/src/hwapi_backd_exec.c~:		for (i=0;i<hw_api_db->max_proc_id;i++) {
+hw_api/lnx/src/hwapi_backd_exec.c~:			if (		hw_api_db->proc_db[i].status.cur_status == PHAL_STATUS_RUN
+hw_api/lnx/src/hwapi_backd_exec.c~:					&& 	hw_api_db->proc_db[i].status.next_status== PHAL_STATUS_RUN
+hw_api/lnx/src/hwapi_backd_exec.c~:					&& (hw_api_db->proc_db[i].cur_tstamp<hw_api_db->time.tslot-maxts)
+hw_api/lnx/src/hwapi_backd_exec.c~:					&& !hw_api_db->proc_db[i].rt_fault) {
+hw_api/lnx/src/hwapi_backd_exec.c~:				if (hw_api_db->cpu_info.print_rtfaults) {
+hw_api/lnx/src/hwapi_backd_exec.c~:					hw_api_db->proc_db[i].rt_fault=1;
+hw_api/lnx/src/hwapi_backd_exec.c~:					//printf("[%d]:\tRT-Fault object %s pid %d (OBJ TS: %d)\n",hw_api_db->time.tslot,hw_api_db->proc_db[i].obj_name,hw_api_db->proc_db[i].pid,hw_api_db->proc_db[i].cur_tstamp);
+hw_api/lnx/src/hwapi_backd_exec.c~:					//set_realtime(hw_api_db->exec_pid, hw_api_db->kernel_prio+1, -1);
+hw_api/lnx/src/hwapi_backd_exec.c~:					sigqueue(hw_api_db->exec_pid,SIG_PROC_CMD,sival);
+hw_api/lnx/src/hwapi_backd_exec.c~:					//set_realtime(hw_api_db->exec_pid, hw_api_db->exec_prio, -1);
+hw_api/lnx/src/hwapi_backd_exec.c~:					printf("[%d]:\tRT-Fault object %s (OBJ TS: %d)\n",hw_api_db->time.tslot,hw_api_db->proc_db[i].obj_name,hw_api_db->proc_db[i].cur_tstamp);
+hw_api/lnx/src/hwapi_backd_exec.c~:	if (hw_api_db->time.new_tstamp && !hw_api_db->time.next_ts) {
+hw_api/lnx/src/hwapi_backd_exec.c~:			hw_api_db->time.tslot=hw_api_db->time.new_tstamp+2;
+hw_api/lnx/src/hwapi_backd_exec.c~:			hw_api_db->time.tslot=hw_api_db->time.new_tstamp+1;
+hw_api/lnx/src/hwapi_backd_exec.c~:		tstamp_to_time(hw_api_db->time.tslot,&hw_api_db->time.slotinit);
+hw_api/lnx/src/hwapi_backd_exec.c~:		//printf("now set timeslot to %d\n",hw_api_db->time.tslot);
+hw_api/lnx/src/hwapi_backd_exec.c~:		hw_api_db->time.new_tstamp=0;
+hw_api/lnx/src/hwapi_backd_exec.c~:		hw_api_db->time.tslot++;
+hw_api/lnx/src/hwapi_backd_exec.c~://		if(hw_api_db->time.tslot > 150000)printf("hwapi_backd_exec.c: hw_api_db->time.tslot++=%u\n", hw_api_db->time.tslot++);
+hw_api/lnx/src/hwapi_backd_exec.c~:		hw_api_db->time.slotinit.tv_usec+=hw_api_db->cpu_info.tslen_usec;
+hw_api/lnx/src/hwapi_backd_exec.c~:		while(hw_api_db->time.slotinit.tv_usec>=1000000) {
+hw_api/lnx/src/hwapi_backd_exec.c~:		  hw_api_db->time.slotinit.tv_sec++;
+hw_api/lnx/src/hwapi_backd_exec.c~:		  hw_api_db->time.slotinit.tv_usec-=1000000;
+hw_api/lnx/src/hwapi_backd_exec.c~:	set_time(&hw_api_db->time.slotinit);
+hw_api/lnx/src/hwapi_backd_exec.c~:	if (hw_api_db->time.next_ts) {
+hw_api/lnx/src/hwapi_backd_exec.c~:		if (hw_api_db->time.next_ts<0) {
+hw_api/lnx/src/hwapi_backd_exec.c~:			printf("is negative, was %d\n",hw_api_db->time.next_ts);
+hw_api/lnx/src/hwapi_backd_exec.c~:			hw_api_db->time.next_ts=hw_api_db->cpu_info.tslen_usec+hw_api_db->time.next_ts;
+hw_api/lnx/src/hwapi_backd_exec.c~:		itval.it_value.tv_nsec = hw_api_db->time.next_ts * 1000;
+hw_api/lnx/src/hwapi_backd_exec.c~:		//printf("now adjusting next ts to %d\n",hw_api_db->time.next_ts);
+hw_api/lnx/src/hwapi_backd_exec.c~:		hw_api_db->time.next_ts=0;
+hw_api/lnx/src/hwapi_backd_exec.c~:	if (hw_api_db->dac_itf && !hw_api_db->dac_drives_clock) {
+hw_api/lnx/src/hwapi_backd_exec.c~:		sem_post(&hw_api_db->sem_dac);
+hw_api/lnx/src/hwapi_backd_exec.c~:	if ((hw_api_db->dac_itf && hw_api_db->dac_drives_clock)
+hw_api/lnx/src/hwapi_backd_exec.c~:			|| hw_api_db->sync_drives_clock) {
+hw_api/lnx/src/hwapi_backd_exec.c~:		if (hw_api_db->sync_drives_clock) {
+hw_api/lnx/src/hwapi_backd_exec.c~:			sem_wait(&hw_api_db->sem_dac);
+hw_api/lnx/src/hwapi_backd_exec.c~:		printva("Setting timer to %d usec\n",hw_api_db->cpu_info.tslen_usec);
+hw_api/lnx/src/hwapi_backd_exec.c~:		ns = hw_api_db->cpu_info.tslen_usec * 1000;
+hw_api/lnx/src/hwapi_backd_exec.c~:		memset(&hw_api_db->time,0,sizeof(struct phtime));
+hw_api/lnx/src/hwapi_backd_exec.c~:				err=read(hw_api_db->timerfd, &exp, sizeof(uint64_t));
+hw_api/lnx/src/hwapi_linux_base.c:		hw_api_db->period_tasks[value].fnc(get_tstamp());
+hw_api/lnx/src/hwapi_linux_base.c:        if (hw_api_db->printbt_atexit && !bt_printed) {
+hw_api/lnx/src/hwapi_linux_base.c:    proc_db = hw_api_db->proc_db;
+hw_api/lnx/src/hwapi_linux_base.c:    int_itf = hw_api_db->int_itf;
+hw_api/lnx/src/hwapi_linux_base.c:    var_db = hw_api_db->var_db;
+hw_api/lnx/src/hwapi_linux_base.c:    ts_len = &hw_api_db->cpu_info.tslen_usec;
+hw_api/lnx/src/hwapi_linux_base.c:	if (hw_api_db->flushout) {
+hw_api/lnx/src/hwapi_linux_base.c:        if (hw_api_db->printbt_atterm) {
+hw_api/lnx/src/hwapi_linux_base.c:		while (i < MAX_DAEMONS && hw_api_db->daemons[i].pid != pid) {
+hw_api/lnx/src/hwapi_linux_base.c:		daemon_i = &hw_api_db->daemons[i];
+hw_api/lnx/src/hwapi_linux_base.c:	daemon_i->sem_idx=hw_api_db->nof_sem_daemons;
+hw_api/lnx/src/hwapi_linux_base.c:	hw_api_db->nof_sem_daemons++;
+hw_api/lnx/src/hwapi_linux_base.c:    my_proc->sys_start=my_proc->tdata[1].tv_usec-hw_api_db->time.slotinit.tv_usec;
+hw_api/lnx/src/hwapi_linux_base.c:    if (my_proc->tdata[2].tv_usec>hw_api_db->time.slotinit.tv_usec)
+hw_api/lnx/src/hwapi_linux_base.c:    	my_proc->sys_end=my_proc->tdata[2].tv_usec-hw_api_db->time.slotinit.tv_usec;
+hw_api/lnx/src/hwapi_linux_base.c:    sem_post(&hw_api_db->sem_objects[my_proc->core_idx][my_proc->sem_idx+1]);
+hw_api/lnx/src/hwapi_linux_base.c:    sem_wait(&hw_api_db->sem_objects[my_proc->core_idx][my_proc->sem_idx]);
+hw_api/lnx/src/hwapi_linux_base.c:		sem_wait(&hw_api_db->sem_daemons[daemon_i->sem_idx]);
+hw_api/lnx/src/hwapi_linux_base.c:    	sleep_us(hw_api_db->cpu_info.tslen_usec);
+hw_api/lnx/src/hwapi_linux_base.c:	while(i<MAX_PERIOD_TASKS && hw_api_db->period_tasks[i].fnc) {
+hw_api/lnx/src/hwapi_linux_base.c:	hw_api_db->period_tasks[i].period=period;
+hw_api/lnx/src/hwapi_linux_base.c:	hw_api_db->period_tasks[i].cnt=0;
+hw_api/lnx/src/hwapi_linux_base.c:	hw_api_db->period_tasks[i].pid=getpid();
+hw_api/lnx/src/hwapi_linux_base.c:	hw_api_db->period_tasks[i].fnc=fnc;
+hw_api/lnx/src/hwapi_linux_base.c:	while(i<MAX_PERIOD_TASKS && hw_api_db->period_tasks[i].fnc!=fnc) {
+hw_api/lnx/src/hwapi_linux_base.c:	memset(&hw_api_db->period_tasks[i],0,sizeof(struct period_task));
+hw_api/lnx/src/hwapi_linux_base.c:	while(i<MAX_PERIOD_TASKS && hw_api_db->period_tasks[i].fnc!=fnc) {
+hw_api/lnx/src/hwapi_linux_base.c:	hw_api_db->period_tasks[i].period=period;
+hw_api/lnx/src/hwapi_linux_base.c:	hw_api_db->period_tasks[i].cnt=0;
+hw_api/lnx/src/hwapi_linux_base.c:    if ((hw_api_db->printbt_atterm && my_proc && my_proc->status.cur_status<5)
+hw_api/lnx/src/hwapi_linux_base.c:            || hw_api_db->printbt_atexit) {
+hw_api/lnx/src/hwapi_backd_dac.c~:	sem_post(&hw_api_db->sem_dac);
+hw_api/lnx/src/hwapi_backd_dac.c~:	sem_wait(&hw_api_db->sem_dac);
+hw_api/lnx/src/hwapi_backd_dac.c~:	set_realtime(getpid(),hw_api_db->kernel_dac_prio,hw_api_db->kernel_dac_cpuid);
+hw_api/lnx/src/hwapi_backd_dac.c~:	if (hw_api_db->dac_drives_clock) {
+hw_api/lnx/src/hwapi_backd_dac.c~:	printf("hwapi_backd_dac.c->configure_dac(): sem_init():output=%d\n", sem_init(&hw_api_db->sem_dac,1,1));
+hw_api/lnx/src/hwapi_backd_dac.c~:	if (!hw_api_db->dac_drives_clock) {
+hw_api/lnx/src/hwapi_backd_dac.c~:		sem_post(&hw_api_db->sem_dac);
+hw_api/lnx/src/hwapi_linux_hwinfo.c:    if (max_itf > hw_api_db->net_db.nof_ext_itf) {
+hw_api/lnx/src/hwapi_linux_hwinfo.c:        max_itf = hw_api_db->net_db.nof_ext_itf;
+hw_api/lnx/src/hwapi_linux_hwinfo.c:        memcpy(&xitf[i], &hw_api_db->net_db.ext_itf[i].info,
+hw_api/lnx/src/hwapi_linux_hwinfo.c:	return hw_api_db->cpu_info.debug_level?1:0;
+hw_api/lnx/src/hwapi_linux_hwinfo.c:    memcpy(info, &hw_api_db->cpu_info, sizeof (struct hwapi_cpu_i));
+hw_api/lnx/src/hwapi_linux_hwinfo.c:    /*msgctl(hw_api_db->data_msg_id, IPC_STAT, &msgstatus);
+hw_api/lnx/src/hwapi_linux_hwinfo.c:    hw_api_db->cpu_info.used_fifo = msgstatus.__msg_cbytes;
+hw_api/lnx/src/hwapi_linux_hwinfo.c:    hw_api_db->cpu_info.total_fifo = msgstatus.msg_qbytes;
+hw_api/lnx/src/hwapi_linux_hwinfo.c:    hw_api_db->cpu_info.pe_id = pe_id;
+Binary file hw_api/lnx/src/bin_runcf-hwapi_backd_exec.o matches
+hw_api/lnx/src/hwapi_linux_var.c:    if (sem_wait(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c:    offset = mem_alloc(hw_api_db->var_table, size);
+hw_api/lnx/src/hwapi_linux_var.c:        if (sem_post(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c:        if (sem_post(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c:    if (i+1>hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c:    	hw_api_db->max_var_id=i+1;
+hw_api/lnx/src/hwapi_linux_var.c:    if (sem_post(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c:	if (sem_post(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c:	 if (sem_wait(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c:    if (sem_wait(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c:        mem_free(hw_api_db->var_table, var_db[stat_id].table_offset);
+hw_api/lnx/src/hwapi_linux_var.c:    if (sem_post(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c:    if (stat_id+1==hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c:    	for (i=hw_api_db->max_var_id;i>=0;i--) {
+hw_api/lnx/src/hwapi_linux_var.c:    			hw_api_db->max_var_id=i+1;
+hw_api/lnx/src/hwapi_linux_var.c:    if (sem_wait(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c:    for (i = 1; i < hw_api_db->max_var_id && k < nof_elems; i++) {
+hw_api/lnx/src/hwapi_linux_var.c:    if (sem_post(&hw_api_db->sem_var)) {
+hw_api/lnx/src/hwapi_linux_var.c:	return hw_api_db->max_var_id;
+hw_api/lnx/src/hwapi_linux_var.c:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c:        printf("HWAPI: Error reading stat: Invalid var id %d, process %d (nof stats=%d)\n",stat_id,getpid(),hw_api_db->max_var_id);
+hw_api/lnx/src/hwapi_linux_var.c:    mem_cpy((mem_o) hw_api_db->var_table, value, var_db[stat_id].table_offset + hw_api_db->var_table, len);
+hw_api/lnx/src/hwapi_linux_var.c:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_var.c:    mem_cpy((mem_o) hw_api_db->var_table, var_db[stat_id].table_offset + hw_api_db->var_table, value, len);
+hw_api/lnx/src/hwapi_linux_var.c:    if (stat_id < 1 || stat_id > hw_api_db->max_var_id) {
+hw_api/lnx/src/hwapi_linux_itf.c:	if (hw_api_db->int_itf[int_pos].hascallback) {
+hw_api/lnx/src/hwapi_linux_itf.c:			if (hw_api_db->int_itf[int_pos].itf_callback[i].pid) {
+hw_api/lnx/src/hwapi_linux_itf.c:				sival.sival_int=((hw_api_db->int_itf[int_pos].itf_callback[i].local_idx<<4)&0xfffffff0);
+hw_api/lnx/src/hwapi_linux_itf.c:				sigqueue(hw_api_db->int_itf[int_pos].itf_callback[i].pid,SIG_PROC_CMD,sival);
+hw_api/lnx/src/hwapi_linux_itf.c:            delay=hw_api_db->default_delay;
+hw_api/lnx/src/hwapi_linux_itf.c:        	msg.head.dst += hw_api_db->external_delay;
+hw_api/lnx/src/hwapi_linux_itf.c:    if (my_proc && hw_api_db->cpu_info.print_itf_pkt) {
+hw_api/lnx/src/hwapi_linux_itf.c:    if (my_proc && hw_api_db->cpu_info.print_itf_pkt) {
+hw_api/lnx/src/hwapi_linux_itf.c:    n = msgsnd(hw_api_db->api_msg_id, &msg, sz_data + MSG_HEAD_SZ + 1, 0);
+hw_api/lnx/src/hwapi_linux_itf.c:    n = msgrcv(hw_api_db->api_msg_id, &msg, MSG_SZ, getpid(), 0);
+hw_api/lnx/src/hwapi_backd_exec.c:	for (i=0;i<hw_api_db->cpu_info.nof_cores;i++) {
+hw_api/lnx/src/hwapi_backd_exec.c:		sem_post(&hw_api_db->sem_objects[i][0]);
+hw_api/lnx/src/hwapi_backd_exec.c:	for (i=0;i<hw_api_db->nof_sem_daemons;i++) {
+hw_api/lnx/src/hwapi_backd_exec.c:		sem_post(&hw_api_db->sem_daemons[i]);
+hw_api/lnx/src/hwapi_backd_exec.c:		if (hw_api_db->period_tasks[i].fnc) {
+hw_api/lnx/src/hwapi_backd_exec.c:			hw_api_db->period_tasks[i].cnt++;
+hw_api/lnx/src/hwapi_backd_exec.c:			if (hw_api_db->period_tasks[i].cnt==hw_api_db->period_tasks[i].period) {
+hw_api/lnx/src/hwapi_backd_exec.c:				sigqueue(hw_api_db->period_tasks[i].pid,SIG_PROC_CMD,val);
+hw_api/lnx/src/hwapi_backd_exec.c:				hw_api_db->period_tasks[i].cnt=0;
+hw_api/lnx/src/hwapi_backd_exec.c:if(hw_api_db->time.tslot == 150000){
+hw_api/lnx/src/hwapi_backd_exec.c:	printf("1500000: hw_api_db->proc_db[i].status.cur_status=%d = 3?\n", hw_api_db->proc_db[i].status.cur_status);	
+hw_api/lnx/src/hwapi_backd_exec.c:	printf("hw_api_db->cpu_info.debug_level=%d\n", hw_api_db->cpu_info.debug_level);	
+hw_api/lnx/src/hwapi_backd_exec.c:	printf("hw_api_db->proc_db[i].relinquished=%d\n", hw_api_db->proc_db[i].relinquished);
+hw_api/lnx/src/hwapi_backd_exec.c:	printf("hw_api_db->time.tslot=%d\n", hw_api_db->time.tslot);
+hw_api/lnx/src/hwapi_backd_exec.c:	i=hw_api_db->max_proc_id-1;
+hw_api/lnx/src/hwapi_backd_exec.c:	if (hw_api_db->proc_db[i].status.cur_status == PHAL_STATUS_RUN
+hw_api/lnx/src/hwapi_backd_exec.c:		&& !hw_api_db->cpu_info.debug_level && !hw_api_db->proc_db[i].relinquished) {
+hw_api/lnx/src/hwapi_backd_exec.c:/*		modinfo_msg("______________________________Tslot=%d",hw_api_db->time.tslot);
+hw_api/lnx/src/hwapi_backd_exec.c:		printf("hw_api_db->proc_db[i].status.cur_status=%d = 3?\n", hw_api_db->proc_db[i].status.cur_status);	
+hw_api/lnx/src/hwapi_backd_exec.c:		printf("!hw_api_db->cpu_info.debug_level=%d\n", !hw_api_db->cpu_info.debug_level);	
+hw_api/lnx/src/hwapi_backd_exec.c:		printf("!hw_api_db->proc_db[i].relinquished=%d\n", !hw_api_db->proc_db[i].relinquished);	
+hw_api/lnx/src/hwapi_backd_exec.c:		printf("[%d]:\tRT-Fault first object still executing (obj ts: %d)\n",hw_api_db->time.tslot,hw_api_db->proc_db[i].cur_tstamp);
+hw_api/lnx/src/hwapi_backd_exec.c:	if (!hw_api_db->cpu_info.debug_level) {
+hw_api/lnx/src/hwapi_backd_exec.c:		for (i=0;i<hw_api_db->max_proc_id;i++) {
+hw_api/lnx/src/hwapi_backd_exec.c:			if (		hw_api_db->proc_db[i].status.cur_status == PHAL_STATUS_RUN
+hw_api/lnx/src/hwapi_backd_exec.c:					&& 	hw_api_db->proc_db[i].status.next_status== PHAL_STATUS_RUN
+hw_api/lnx/src/hwapi_backd_exec.c:					&& (hw_api_db->proc_db[i].cur_tstamp<hw_api_db->time.tslot-maxts)
+hw_api/lnx/src/hwapi_backd_exec.c:					&& !hw_api_db->proc_db[i].rt_fault) {
+hw_api/lnx/src/hwapi_backd_exec.c:				if (hw_api_db->cpu_info.print_rtfaults) {
+hw_api/lnx/src/hwapi_backd_exec.c:					hw_api_db->proc_db[i].rt_fault=1;
+hw_api/lnx/src/hwapi_backd_exec.c:					//printf("[%d]:\tRT-Fault object %s pid %d (OBJ TS: %d)\n",hw_api_db->time.tslot,hw_api_db->proc_db[i].obj_name,hw_api_db->proc_db[i].pid,hw_api_db->proc_db[i].cur_tstamp);
+hw_api/lnx/src/hwapi_backd_exec.c:					//set_realtime(hw_api_db->exec_pid, hw_api_db->kernel_prio+1, -1);
+hw_api/lnx/src/hwapi_backd_exec.c:					sigqueue(hw_api_db->exec_pid,SIG_PROC_CMD,sival);
+hw_api/lnx/src/hwapi_backd_exec.c:					//set_realtime(hw_api_db->exec_pid, hw_api_db->exec_prio, -1);
+hw_api/lnx/src/hwapi_backd_exec.c:					printf("[%d]:\tRT-Fault object %s (OBJ TS: %d)\n",hw_api_db->time.tslot,hw_api_db->proc_db[i].obj_name,hw_api_db->proc_db[i].cur_tstamp);
+hw_api/lnx/src/hwapi_backd_exec.c:	if (hw_api_db->time.new_tstamp && !hw_api_db->time.next_ts) {
+hw_api/lnx/src/hwapi_backd_exec.c:			hw_api_db->time.tslot=hw_api_db->time.new_tstamp+2;
+hw_api/lnx/src/hwapi_backd_exec.c:			hw_api_db->time.tslot=hw_api_db->time.new_tstamp+1;
+hw_api/lnx/src/hwapi_backd_exec.c:		tstamp_to_time(hw_api_db->time.tslot,&hw_api_db->time.slotinit);
+hw_api/lnx/src/hwapi_backd_exec.c:		//printf("now set timeslot to %d\n",hw_api_db->time.tslot);
+hw_api/lnx/src/hwapi_backd_exec.c:		hw_api_db->time.new_tstamp=0;
+hw_api/lnx/src/hwapi_backd_exec.c:		hw_api_db->time.tslot++;
+hw_api/lnx/src/hwapi_backd_exec.c://		if(hw_api_db->time.tslot > 150000)printf("hwapi_backd_exec.c: hw_api_db->time.tslot++=%u\n", hw_api_db->time.tslot++);
+hw_api/lnx/src/hwapi_backd_exec.c:		hw_api_db->time.slotinit.tv_usec+=hw_api_db->cpu_info.tslen_usec;
+hw_api/lnx/src/hwapi_backd_exec.c:		while(hw_api_db->time.slotinit.tv_usec>=1000000) {
+hw_api/lnx/src/hwapi_backd_exec.c:		  hw_api_db->time.slotinit.tv_sec++;
+hw_api/lnx/src/hwapi_backd_exec.c:		  hw_api_db->time.slotinit.tv_usec-=1000000;
+hw_api/lnx/src/hwapi_backd_exec.c:	set_time(&hw_api_db->time.slotinit);
+hw_api/lnx/src/hwapi_backd_exec.c:	if (hw_api_db->time.next_ts) {
+hw_api/lnx/src/hwapi_backd_exec.c:		if (hw_api_db->time.next_ts<0) {
+hw_api/lnx/src/hwapi_backd_exec.c:			printf("is negative, was %d\n",hw_api_db->time.next_ts);
+hw_api/lnx/src/hwapi_backd_exec.c:			hw_api_db->time.next_ts=hw_api_db->cpu_info.tslen_usec+hw_api_db->time.next_ts;
+hw_api/lnx/src/hwapi_backd_exec.c:		itval.it_value.tv_nsec = hw_api_db->time.next_ts * 1000;
+hw_api/lnx/src/hwapi_backd_exec.c:		//printf("now adjusting next ts to %d\n",hw_api_db->time.next_ts);
+hw_api/lnx/src/hwapi_backd_exec.c:		hw_api_db->time.next_ts=0;
+hw_api/lnx/src/hwapi_backd_exec.c:	if (hw_api_db->dac_itf && !hw_api_db->dac_drives_clock) {
+hw_api/lnx/src/hwapi_backd_exec.c:		sem_post(&hw_api_db->sem_dac);
+hw_api/lnx/src/hwapi_backd_exec.c:	if ((hw_api_db->dac_itf && hw_api_db->dac_drives_clock)
+hw_api/lnx/src/hwapi_backd_exec.c:			|| hw_api_db->sync_drives_clock) {
+hw_api/lnx/src/hwapi_backd_exec.c:		if (hw_api_db->sync_drives_clock) {
+hw_api/lnx/src/hwapi_backd_exec.c:			sem_wait(&hw_api_db->sem_dac);
+hw_api/lnx/src/hwapi_backd_exec.c:		printva("Setting timer to %d usec\n",hw_api_db->cpu_info.tslen_usec);
+hw_api/lnx/src/hwapi_backd_exec.c:		ns = hw_api_db->cpu_info.tslen_usec * 1000;
+hw_api/lnx/src/hwapi_backd_exec.c:		memset(&hw_api_db->time,0,sizeof(struct phtime));
+hw_api/lnx/src/hwapi_backd_exec.c:				err=read(hw_api_db->timerfd, &exp, sizeof(uint64_t));
+hw_api/lnx/src/hwapi_linux_man.c:		if (strlen(res_name) + strlen(hw_api_db->res_path) + 2 > MAX_PATH_LEN) {
+hw_api/lnx/src/hwapi_linux_man.c://				printf("hwapi_res_parseall_(): hw_api_db->res_path= %s\n", hw_api_db->res_path);
+hw_api/lnx/src/hwapi_linux_man.c:        sprintf(path, "%s/%s", hw_api_db->res_path, res_name);
+hw_api/lnx/src/hwapi_linux_man.c:    if (strlen(res_name) + strlen(hw_api_db->res_path) + 2 > MAX_PATH_LEN) {
+hw_api/lnx/src/hwapi_linux_man.c://	printf("hwapi_res_open()0: APP='%s', hw_api_db->resource_path=%s, resource_name=%s\n", path, hw_api_db->res_path, res_name);
+hw_api/lnx/src/hwapi_linux_man.c:		//printf("hwapi_res_open()0: APP_NAME='.%s%s', MODULE_NAME=%s\n", hw_api_db->res_path, path, res_name);
+hw_api/lnx/src/hwapi_linux_man.c://		printf("hwapi_res_open()0: APP_NAME='.%s%s'\n", hw_api_db->res_path, path);
+hw_api/lnx/src/hwapi_linux_man.c:    /*AGBJuly15	sprintf(path, "%s/%s", hw_api_db->res_path, res_name);*/
+hw_api/lnx/src/hwapi_linux_man.c:    sprintf(lnk,"%s/%s",hw_api_db->res_path,"lnk.cmd");
+hw_api/lnx/src/hwapi_linux_man.c:            hw_api_db->res_path,res_name,hw_api_db->res_path,output_res_name,new_address,new_len);
+hw_api/lnx/src/hwapi_linux_man.c:    sprintf(buff,"%s/%s",hw_api_db->res_path,res_name);
+hw_api/lnx/src/hwapi_linux_man.c~:		if (strlen(res_name) + strlen(hw_api_db->res_path) + 2 > MAX_PATH_LEN) {
+hw_api/lnx/src/hwapi_linux_man.c~://				printf("hwapi_res_parseall_(): hw_api_db->res_path= %s\n", hw_api_db->res_path);
+hw_api/lnx/src/hwapi_linux_man.c~:        sprintf(path, "%s/%s", hw_api_db->res_path, res_name);
+hw_api/lnx/src/hwapi_linux_man.c~:    if (strlen(res_name) + strlen(hw_api_db->res_path) + 2 > MAX_PATH_LEN) {
+hw_api/lnx/src/hwapi_linux_man.c~://	printf("hwapi_res_open()0: APP='%s', hw_api_db->resource_path=%s, resource_name=%s\n", path, hw_api_db->res_path, res_name);
+hw_api/lnx/src/hwapi_linux_man.c~:		//printf("hwapi_res_open()0: APP_NAME='.%s%s', MODULE_NAME=%s\n", hw_api_db->res_path, path, res_name);
+hw_api/lnx/src/hwapi_linux_man.c~:		printf("hwapi_res_open()0: APP_NAME='.%s%s'\n", hw_api_db->res_path, path);
+hw_api/lnx/src/hwapi_linux_man.c~:    /*AGBJuly15	sprintf(path, "%s/%s", hw_api_db->res_path, res_name);*/
+hw_api/lnx/src/hwapi_linux_man.c~:    sprintf(lnk,"%s/%s",hw_api_db->res_path,"lnk.cmd");
+hw_api/lnx/src/hwapi_linux_man.c~:            hw_api_db->res_path,res_name,hw_api_db->res_path,output_res_name,new_address,new_len);
+hw_api/lnx/src/hwapi_linux_man.c~:    sprintf(buff,"%s/%s",hw_api_db->res_path,res_name);
+hw_api/lnx/src/hwapi_backd_signals.c:	struct net_db *net_db=&hw_api_db->net_db;
+hw_api/lnx/src/hwapi_backd_signals.c:		if (hw_api_db->daemons[i].pid) {
+hw_api/lnx/src/hwapi_backd_signals.c:			if (waitpid(hw_api_db->daemons[i].pid, NULL, WNOHANG) > 0) {
+hw_api/lnx/src/hwapi_backd_signals.c:					printf(	"\033[1;31m HWAPI_BACKD: Fatal error. Daemon %s died (pid %d). Should exit...\033[0m\n", hw_api_db->daemons[i].path,hw_api_db->daemons[i].pid);
+hw_api/lnx/src/hwapi_backd_signals.c:				hw_api_db->daemons[i].pid = 0;
+hw_api/lnx/src/hwapi_backd_signals.c:		if (hw_api_db->proc_db[i].pid) {
+hw_api/lnx/src/hwapi_backd_signals.c:			if (waitpid(hw_api_db->proc_db[i].pid, NULL, WNOHANG) > 0) {
+hw_api/lnx/src/hwapi_backd_signals.c:				if (die_silent && hw_api_db->proc_db[i].status.cur_status != 6
+hw_api/lnx/src/hwapi_backd_signals.c:						&& hw_api_db->proc_db[i].status.cur_status != 7
+hw_api/lnx/src/hwapi_backd_signals.c:						&& !hw_api_db->proc_db[i].rt_fault) {
+hw_api/lnx/src/hwapi_backd_signals.c:							hw_api_db->proc_db[i].obj_name,
+hw_api/lnx/src/hwapi_backd_signals.c:							hw_api_db->proc_db[i].obj_id, (int) t.tv_sec,
+hw_api/lnx/src/hwapi_backd_signals.c:							(int) t.tv_usec, hw_api_db->proc_db[i].cur_tstamp,
+hw_api/lnx/src/hwapi_backd_signals.c:							hw_api_db->proc_db[i].status.cur_status);
+hw_api/lnx/src/hwapi_backd_signals.c:				hw_api_db->proc_db[i].pid = 0;
+hw_api/lnx/src/hwapi_linux_proc.c:    if (i+1>hw_api_db->max_proc_id)
+hw_api/lnx/src/hwapi_linux_proc.c:    	hw_api_db->max_proc_id=i+1;
+hw_api/lnx/src/hwapi_linux_proc.c:    while (i < hw_api_db->max_proc_id && proc_db[i].obj_id != obj_id) {
+hw_api/lnx/src/hwapi_linux_proc.c:    if (i == hw_api_db->max_proc_id) {
+hw_api/lnx/src/hwapi_linux_proc.c:    if (i+1==hw_api_db->max_proc_id) {
+hw_api/lnx/src/hwapi_linux_proc.c:    	for (i=hw_api_db->max_proc_id;i>=0;i--) {
+hw_api/lnx/src/hwapi_linux_proc.c:    			hw_api_db->max_proc_id=i+1;
+hw_api/lnx/src/hwapi_linux_proc.c:    while (i < hw_api_db->max_proc_id && proc_db[i].obj_id != obj_id) {
+hw_api/lnx/src/hwapi_linux_proc.c:    if (i == hw_api_db->max_proc_id) {
+hw_api/lnx/src/hwapi_linux_proc.c:    while (i < hw_api_db->max_proc_id && proc_db[i].obj_id != obj_id) {
+hw_api/lnx/src/hwapi_linux_proc.c:    if (i == hw_api_db->max_proc_id) {
+hw_api/lnx/src/hwapi_linux_proc.c:    sem_wait(&hw_api_db->sem_status);
+hw_api/lnx/src/hwapi_linux_proc.c:    sem_post(&hw_api_db->sem_status);
+hw_api/lnx/src/hwapi_linux_proc.c:    while (i < hw_api_db->max_proc_id && proc_db[i].obj_id != obj_id) {
+hw_api/lnx/src/hwapi_linux_proc.c:    if (i == hw_api_db->max_proc_id) {
+hw_api/lnx/src/hwapi_linux_proc.c:    sem_wait(&hw_api_db->sem_status);
+hw_api/lnx/src/hwapi_linux_proc.c:    sem_post(&hw_api_db->sem_status);
+hw_api/lnx/src/hwapi_linux_proc.c:    while (i < hw_api_db->max_proc_id && proc_db[i].obj_id != obj_id) {
+hw_api/lnx/src/hwapi_linux_proc.c:    if (i == hw_api_db->max_proc_id) {
+hw_api/lnx/src/hwapi_linux_proc.c:    sem_wait(&hw_api_db->sem_status);
+hw_api/lnx/src/hwapi_linux_proc.c:    sem_post(&hw_api_db->sem_status);
+hw_api/lnx/src/hwapi_linux_proc.c:    while (i < hw_api_db->max_proc_id && proc_db[i].obj_id != obj_id) {
+hw_api/lnx/src/hwapi_linux_proc.c:    if (i == hw_api_db->max_proc_id) {
+hw_api/lnx/src/hwapi_linux_proc.c: * The function returns the hw_api_db->proc_db buffer size
+hw_api/lnx/src/hwapi_linux_proc.c:    return hw_api_db->max_proc_id;
+hw_api/lnx/src/hwapi_linux_proc.c:	if (hw_api_db->max_proc_id>max_procs)
+hw_api/lnx/src/hwapi_linux_proc.c:		n=hw_api_db->max_proc_id;
+hw_api/lnx/src/hwapi_linux_proc.c:	memcpy(pinfo,hw_api_db->proc_db,n*sizeof(struct hwapi_proc_i));
+hw_api/lnx/src/hwapi_backd.c:	hw_api_db->net_db.net_chld = 0;
+hw_api/lnx/src/hwapi_backd.c:	if (hw_api_db->net_db.nof_ext_itf) {
+hw_api/lnx/src/hwapi_backd.c:		Net_thread(hw_api_db, hw_api_db->data_msg_id);
+hw_api/lnx/src/hwapi_backd.c://	printf("hw_api_db->dac_itf=%s\n", hw_api_db->dac_itf);
+hw_api/lnx/src/hwapi_backd.c:	if (hw_api_db->dac_itf != NULL) {
+hw_api/lnx/src/hwapi_backd.c:		if (!configure_dac(hw_api_db->dac_itf, &hw_api_db->dac, &hw_api_db->cpu_info.tslen_usec)) {
+hw_api/lnx/src/hwapi_backd.c:	if (!hw_api_db->cpu_info.tslen_usec) {
+hw_api/lnx/src/hwapi_backd.c:		printf("KERNEL:\tTime slot duration set to %d usec\n", hw_api_db->cpu_info.tslen_usec);
+hw_api/lnx/src/hwapi_backd.c:	if (!set_realtime(0, hw_api_db->kernel_prio, hw_api_db->kernel_cpuid)) {
+hw_api/lnx/src/hwapi_backd.c:	hw_api_db->runph_pid = runph_pid;
+hw_api/lnx/src/hwapi_backd.c:	//hw_api_db->runph_grp=getpgrp();
+Binary file hw_api/lnx/bin/runcf matches
+modules/dac_USRP_TX/src/dac_USRP_TX.c://	printf("!hw_api_db->proc_db[i].relinquished=%d\n", !hw_api_db->proc_db[i].relinquished);	
+modules/dac_USRP_TX/src/dac_USRP_TX.c~://	printf("!hw_api_db->proc_db[i].relinquished=%d\n", !hw_api_db->proc_db[i].relinquished);	
+output.log:hw_api_db->dac_itf=ÝB

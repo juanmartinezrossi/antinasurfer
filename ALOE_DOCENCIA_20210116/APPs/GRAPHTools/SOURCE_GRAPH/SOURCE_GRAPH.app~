@@ -1,0 +1,23 @@
+object {
+	obj_name=data_source
+	exe_name=data_source
+#	kopts=240
+	outputs {
+		name=output_0
+		remote_itf=input_0
+		remote_obj=GRAPH
+#		kbpts=8000.3
+	}
+}
+#######################################################################DATASOURCE
+#######################################################################GRAPH
+object {
+	obj_name=GRAPH				
+	exe_name=GRAPH		
+#	kopts=2500
+	inputs {
+		name=input_0
+		remote_itf=output_0
+		remote_obj=data_source
+	}
+}

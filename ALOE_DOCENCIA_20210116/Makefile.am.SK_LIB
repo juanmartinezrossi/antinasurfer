@@ -1,0 +1,19 @@
+
+SUBDIRS=aloeSKs/aloeSK15/aloeplot/lnx_make aloeSKs/aloeSK15/extern/datafile/lnx_make aloeSKs/aloeSK15/skel_SK15/lnx_make utils/lnx_make hw_api/lnx sw_daemons/lnx_make cmdman_console sw_api/lnx_make modules/typetools/lnx_make modules/channel_noise/lnx_make/ modules/DAC_JACK0/lnx_make/ modules/dac_tx/lnx_make/ modules/DAC_USRP/lnx_make/ modules/data_source/lnx_make/ modules/data_source_sink/lnx_make/ modules/fft_ifft/lnx_make/ modules/gen9SK_CRC/lnx_make/ modules/gen9SK_cyclic/lnx_make/ modules/gen9SK_ifft/lnx_make/ modules/gen_binsource/lnx_make/ modules/gen_crc/lnx_make/ modules/gen_interleaver/lnx_make/ modules/gen_sink/lnx_make/ modules/gen_symbolmapper/lnx_make/ modules/LTE_bitInterleaver/lnx_make/ modules/module_template/lnx_make/ modules/module_template2/lnx_make/ modules/module_template3/lnx_make/ modules/moduloP1/lnx_make/ modules/sink_graph/lnx_make/ modules/sink_plot/lnx_make/ modules/test2outputs/lnx_make/ modules/utran_turbocoder/lnx_make/ modules/utran_turbodecoder/lnx_make/ 
+
+EXTRA_DIST=scripts doc example-repository aloeui matlab aloeui.run
+
+dist_bin_SCRIPTS=scripts/viewlogs.sh scripts/update_modules.pl aloeui.run
+
+dist-hook:
+	rm -rf `find $(distdir)/ -name .svn`
+	rm -rf `find $(distdir)/ -name .deps`
+	rm -rf `find $(distdir)/ -name .libs`
+	rm -rf `find $(distdir)/ -name bin_*`
+	rm -rf `find $(distdir)/ -name lib_*`
+	rm -rf `find $(distdir)/ -name ._*`
+	rm -rf `find $(distdir)/ -name .dirstamp`
+	
+	
+	
+	

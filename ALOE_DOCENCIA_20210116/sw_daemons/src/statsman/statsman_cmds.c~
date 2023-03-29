@@ -1,0 +1,765 @@
+/*
+ * statsman_cmds.c
+ *
+ * Copyright (c) 2009 Ismael Gomez-Miguelez, UPC <ismael.gomez at tsc.upc.edu>. All rights reserved.
+ *
+ *
+ * This file is part of ALOE.
+ *
+ * ALOE is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * ALOE is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with ALOE.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+/* standard libraries */
+#include <stdlib.h>
+#include <string.h>
+#include <mcheck.h>
+#include "phid.h"
+#include "phal_daemons.h"
+
+#include "phal_hw_api.h"
+
+#include "set.h"
+#include "str.h"
+#include "var.h"
+#include "rtcobj.h"
+#include "phitf.h"
+#include "phobj.h"
+#include "log.h"
+#include "pkt.h"
+#include "app.h"
+#include "daemon.h"
+
+#include "stats_cmds.h"
+#include "statsman_cmds.h"
+#include "cmdman_cmds.h"
+#include "stats.h"
+
+#include "statsman_parser.h"
+
+/*#define DEB
+*/
+#define BASE_LOG_PATH	"logs/"
+#define BASE_REPORT_PATH "reports/"
+
+char aux_str[128];
+
+/* This is the main database for apps */
+Set_o app_db = NULL;
+
+phobj_o app_findappobjpkt(Set_o app_set, pkt_o pkt);
+
+
+#define NOF_OBJ	100
+#define NOF_ITF	1000
+#define NOF_STR	1000
+#define NOF_VAR	100
+#define NOF_APP 10
+#define NOF_SET	800
+#define NOF_SETMEM 1000
+
+void statsman_alloc() {
+#ifdef MTRACE
+    mtrace();
+#endif
+    hwapi_mem_prealloc(NOF_OBJ, phobj_sizeof);
+    hwapi_mem_prealloc(NOF_OBJ, rtcobj_sizeof);
+    hwapi_mem_prealloc(NOF_OBJ, log_sizeof);
+    hwapi_mem_prealloc(NOF_ITF, phitf_sizeof);
+    hwapi_mem_prealloc(NOF_STR, str_sizeof);
+    hwapi_mem_prealloc(NOF_APP, app_sizeof);
+    hwapi_mem_prealloc(NOF_VAR, var_sizeof);
+    hwapi_mem_prealloc(NOF_SET, set_sizeof);
+    hwapi_mem_prealloc(NOF_SETMEM, setmember_sizeof);
+    hwapi_mem_prealloc(1, daemon_sizeof);
+    hwapi_mem_prealloc(1, pkt_sizeof);
+}
+
+
+daemon_o daemon;
+pkt_o pkt;
+
+/* function to initialize database */
+int statsman_init(daemon_o d) {
+    app_db = Set_new(0, NULL);
+    if (!app_db) {
+        daemon_error(daemon, "Error creating main database");
+        return -1;
+    }
+    daemon = d;
+    pkt = daemon_pkt(daemon);
+    return 1;
+}
+
+void st_pm_init_error(char st_pm) {
+    objid_t obj_id;
+    var_o var=NULL;
+    varid_t pmid;
+
+    obj_id = (objid_t) pkt_getvalue(pkt, FIELD_OBJID);
+
+    if (st_pm) {
+        var = pkt_get(pkt, FIELD_STAT, var_newfrompkt);
+        if (!var) {
+            printf("STATSMAN: Caution var id not found\n");
+        }
+    } else {
+        pmid = pkt_getvalue(pkt, FIELD_PMID);
+    }
+
+    pkt_clear(pkt);
+
+    pkt_putvalue(pkt, FIELD_OBJID, (uint) obj_id);
+    if (st_pm) {
+        pkt_putvalue(pkt, FIELD_STID, var?var->id:0);
+    } else {
+        pkt_putvalue(pkt, FIELD_PMID, pmid);
+    }
+
+    daemon_sendto(daemon, st_pm ? STATS_STINITERR : STATS_PMINITERR,
+            pkt_getsrcpe(pkt),
+            DAEMON_STATS);
+
+    if (var) {
+        var_delete(&var);
+    }
+}
+
+char log_name[1024];
+
+/** statsman_incmd_init
+ */
+int statsman_incmd_init(cmd_t *cmd) {
+    phobj_o obj;
+    var_o stat, x;
+    log_o log;
+    app_o app;
+    int pmid;
+    str_o app_name, obj_name;
+    int i;
+    varid_t logid;
+    
+    app_name = pkt_get(pkt, FIELD_APPNAME, str_newfrompkt);
+    if (!app_name) {
+        daemon_error(daemon, "Invalid packet. Missing app_name");
+        st_pm_init_error(1);
+        return 0;
+    }
+    obj_name = pkt_get(pkt, FIELD_OBJNAME, str_newfrompkt);
+    if (!obj_name) {
+        daemon_error(daemon, "Invalid packet. Missing obj_name");
+        st_pm_init_error(1);
+        return 0;
+    }
+    app = Set_find(app_db, app_name, app_findname);
+    if (!app) {
+        app = app_new();
+        if (!app) {
+            daemon_error(daemon, "Error creating app");
+            st_pm_init_error(1);
+            str_delete(&app_name);
+            return 0;
+        }
+        str_cpy(app->name, app_name);
+        Set_put(app_db, app);
+    }
+
+    str_delete(&app_name);
+
+    obj = Set_find(app->objects, obj_name, phobj_findobjname);
+    if (!obj) {
+        obj = phobj_new();
+        if (!obj) {
+            daemon_error(daemon, "Error creating obj");
+            st_pm_init_error(1);
+            str_delete(&obj_name);
+            return 0;
+        }
+        str_cpy(obj->objname, obj_name);
+        str_cpy(obj->appname, app->name);
+        obj->obj_id = (objid_t) pkt_getvalue(pkt, FIELD_OBJID);
+        obj->pe_id = (peid_t) pkt_getsrcpe(pkt);
+        Set_put(app->objects, obj);
+    }
+
+    str_delete(&obj_name);
+
+
+    switch (pkt_getcmd(pkt)) {
+        case STATSMAN_STINITOBJECT:
+            /** todo: during initialization phase, check if a remote object statistics
+             * is available. the problem is that it might not be initialized yet.
+             */
+            break;
+        case STATSMAN_STINIT:
+            stat = pkt_get(pkt, FIELD_STAT, var_newfrompkt);
+            if (!stat) {
+                daemon_error(daemon, "Can't create stat");
+                st_pm_init_error(1);
+                return 0;
+            }
+            x = Set_find(obj->stats, &stat->id, var_findid);
+            if (x) {
+                Set_remove(obj->stats, x);
+                var_delete(&x);
+            }
+            Set_put(obj->stats, stat);
+
+            pkt_clear(pkt);
+
+            pkt_putvalue(pkt, FIELD_OBJID, (uint) obj->obj_id);
+            pkt_putvalue(pkt, FIELD_STID, (uint) stat->id);
+            
+            #ifdef DEB
+            daemon_info(daemon, "Stat %s:%s initiated, Id %d\n",str_str(obj->objname),str_str(stat->name),stat->id);
+            #endif
+
+            daemon_sendto(daemon, STATS_STINITOK,
+                    pkt_getsrcpe(pkt), DAEMON_STATS);
+            break;
+
+        case STATSMAN_PMINIT:
+            if (Set_length(obj->params)) {
+                daemon_info(daemon, "Caution object %s already have %d parameters parsed. Deleting.", str_str(obj->objname),Set_length(obj->params));
+                Set_destroy(&obj->params,var_xdelete);
+                obj->params = Set_new(0,NULL);
+            }
+            if (!statsman_parser_params(obj)) {
+                #ifdef DEB
+                daemon_error(daemon, "Error parsing parameter file for object %s",str_str(obj->objname));
+                #endif
+                st_pm_init_error(0);
+                return 0;
+            }
+
+            daemon_info(daemon, "Initialized parameters for object %s",str_str(obj->objname));
+            
+            pmid = pkt_getvalue(pkt, FIELD_PMID);
+
+            pkt_clear(pkt);
+
+            pkt_putvalue(pkt, FIELD_OBJID, obj->obj_id);
+            pkt_putvalue(pkt, FIELD_PMID, pmid);
+
+            daemon_sendto(daemon, STATS_PMINITOK,
+                    pkt_getsrcpe(pkt), DAEMON_STATS);
+
+            break;
+        case STATSMAN_LOGINIT:
+            /* ensure it does not already exist */
+            logid = pkt_getvalue(pkt, FIELD_LOGID);
+            log = Set_find(obj->logs, &logid, log_findid);
+            if (log) {
+                daemon_error(daemon, "Object %s, log %d already exists.",
+                        str_str(obj->objname), pkt_getvalue(pkt, FIELD_LOGID));
+                daemon_sendto(daemon, STATS_LOGINITERR,
+                        pkt_getsrcpe(pkt), DAEMON_STATS);
+                return -1;
+            }
+
+            /*AGBJuly15	sprintf(log_name, "%s/%s/%s.log", BASE_LOG_PATH, str_str(obj->appname), str_str(obj->objname));*/
+			sprintf(log_name, "%s%s.log", BASE_LOG_PATH, str_str(obj->objname));
+
+            log = log_new(logid, log_name);
+            if (!log) {
+                daemon_error(daemon, "Can't create resource for %s", str_str(obj->objname));
+                daemon_sendto(daemon, STATS_LOGINITERR,
+                        pkt_getsrcpe(pkt), DAEMON_STATS);
+            } else {
+                daemon_sendto(daemon, STATS_LOGINITOK,
+                        pkt_getsrcpe(pkt), DAEMON_STATS);
+                Set_put(obj->logs, log);
+            }
+
+            #ifdef DEB
+            daemon_info(daemon, "Log for object %s initiated, Id %d\n",str_str(obj->objname),logid);
+            #endif
+
+            break;
+        default:
+            daemon_error(daemon, "Error in command");
+            return -1;
+    }
+
+    return 1;
+
+}
+
+/** statsman_incmd_close
+ */
+int statsman_incmd_close(cmd_t *cmd) {
+    phobj_o obj;
+    var_o stat;
+    log_o log;
+    app_o app;
+    int i;
+    objid_t objid;
+    varid_t varid;
+
+    obj = NULL;
+    objid = pkt_getvalue(pkt, FIELD_OBJID);
+    for (i = 0; !obj && i < Set_length(app_db); i++) {
+        app = Set_get(app_db, i);
+        assert(app);
+        obj = Set_find(app->objects, &objid, phobj_findid);
+    }
+    if (!obj) {
+        daemon_error(daemon, "Can't find object 0x%x", objid);
+        return -1;
+    }
+
+    switch (pkt_getcmd(pkt)) {
+        case STATSMAN_STCLOSE:
+            varid = pkt_getvalue(pkt,FIELD_STID);
+            stat = Set_find(obj->stats, &varid, var_findid);
+            if (!stat) {
+                daemon_error(daemon, "Can't find stat id %d\n",varid);
+                return -1;
+            }
+
+            Set_remove(obj->stats, stat);
+            var_delete(&stat);
+            break;
+
+        case STATSMAN_PMCLOSE:
+            varid = pkt_getvalue(pkt,FIELD_STID);
+            Set_destroy(&obj->params, var_xdelete);
+            obj->params = Set_new(0, NULL);
+            break;
+        case STATSMAN_LOGCLOSE:
+            varid = pkt_getvalue(pkt,FIELD_LOGID);
+            log = Set_find(obj->logs, &varid, log_findid);
+            if (!log) {
+                daemon_error(daemon, "Log %d of object %s does not exists.", varid, str_str(obj->objname));
+                return -1;
+            }
+            Set_remove(obj->logs, log);
+            log_delete(&log);
+            break;
+        default:
+            daemon_error(daemon, "Error in command");
+            break;
+    }
+
+    if (!Set_length(obj->stats) && !Set_length(obj->logs) && !Set_length(obj->params)) {
+        #ifdef DEB
+      	daemon_info(daemon, "Removed object %s",str_str(obj->objname));
+        #endif
+        Set_remove(app->objects, obj);
+        phobj_delete(&obj);
+    }
+
+    if (!Set_length(app->objects)) {
+        daemon_info(daemon, "Removed app %s",str_str(app->name));
+        Set_remove(app_db, app);
+        app_delete(&app);
+    }
+    return 1;
+}
+
+int statsman_incmd_statls(cmd_t *cmd) {
+    phobj_o obj;
+    str_o obj_name, app_name;
+    app_o app;
+
+    app_name = pkt_get(pkt, FIELD_APPNAME, str_newfrompkt);
+    if (!app_name) {
+        daemon_error(daemon, "Invalid packet. Missing app name");
+        daemon_sendto(daemon, CMDMAN_STATSLSERR, 0, DAEMON_CMDMAN);
+        return 0;
+    }
+    app = Set_find(app_db, app_name, app_findname);
+    if (!app) {
+        daemon_error(daemon, "Can't find app %s\n", str_str(app_name));
+        daemon_sendto(daemon, CMDMAN_STATSLSERR, 0, DAEMON_CMDMAN);
+        str_delete(&app_name);
+        return 0;
+    }
+
+    str_delete(&app_name);
+
+    pkt_clear(pkt);
+
+    obj_name = pkt_get(pkt, FIELD_OBJNAME, str_newfrompkt);
+    if (obj_name) {
+        obj = Set_find(app->objects, obj_name, phobj_findobjname);
+        if (!obj) {
+            daemon_error(daemon, "Can't find object %s\n", str_str(obj_name));
+            daemon_sendto(daemon, CMDMAN_STATSLSERR, 0, DAEMON_CMDMAN);
+            str_delete(&obj_name);
+            return 1;
+        }
+        str_delete(&obj_name);
+        app = app_new();
+        str_cpy(app->name, obj->appname);
+        Set_put(app->objects, obj);
+    }
+    if (!pkt_put(pkt, FIELD_STATLIST, app, app_topkt)) {
+        daemon_error(daemon, "Error sending app stat list");
+        daemon_sendto(daemon, CMDMAN_STATSLSERR, pkt_getsrcpe(pkt), DAEMON_CMDMAN);
+        return 0;
+    }
+    if (obj_name) {
+        app_delete(&app);
+    }
+    daemon_sendto(daemon, CMDMAN_STATSLSOK, pkt_getsrcpe(pkt), DAEMON_CMDMAN);
+    return 1;
+}
+
+/** statsman_incmd_stact
+ */
+int statsman_incmd_stact(cmd_t *cmd) {
+    phobj_o obj;
+    var_o stat;
+    str_o stat_name;
+    int window;
+
+    obj = app_findappobjpkt(app_db, pkt);
+    if (!obj) {
+        daemon_error(daemon, "Invalid packet. Can't find object");
+        daemon_sendto(daemon, CMDMAN_STVALERR, 0, DAEMON_CMDMAN);
+        return 0;
+    }
+
+    stat_name = pkt_get(pkt, FIELD_STNAME, str_newfrompkt);
+    if (!stat_name) {
+        daemon_error(daemon, "Invalid packet. Missing stat name.");
+        daemon_sendto(daemon, CMDMAN_STVALERR, 0, DAEMON_CMDMAN);
+        return 0;
+    }
+    stat = Set_find(obj->stats, stat_name, var_findname);
+    if (!stat) {
+        daemon_error(daemon, "Can't find stat %s at object %s app %s", str_str(stat_name), str_str(obj->objname), str_str(obj->appname));
+        daemon_sendto(daemon, CMDMAN_STVALERR, 0, DAEMON_CMDMAN);
+        str_delete(&stat_name);
+        return 0;
+    }
+
+    str_delete(&stat_name);
+
+    if (pkt_getcmd(pkt) == STATSMAN_STSET) {
+        var_setvalue(stat, pkt_getptr(pkt, FIELD_STVALUE), pkt_getvalue(pkt, FIELD_STSIZE));
+    } else if (pkt_getcmd(pkt) == STATSMAN_STGET) {
+        window = pkt_getvalue(pkt, FIELD_STREPORTWINDOW);
+    }
+
+    switch (pkt_getcmd(pkt)) {
+        case STATSMAN_STSET:
+            pkt_clear(pkt);
+            pkt_putvalue(pkt, FIELD_OBJID, obj->obj_id);
+            pkt_put(pkt, FIELD_STAT, stat, var_topkt);
+            daemon_sendto(daemon, STATS_STSET, obj->pe_id,
+                    DAEMON_STATS);
+            break;
+        case STATSMAN_STGET:
+            pkt_clear(pkt);
+            pkt_putvalue(pkt, FIELD_OBJID, obj->obj_id);
+            pkt_put(pkt, FIELD_STAT, stat, var_topkt);
+            pkt_putvalue(pkt, FIELD_STREPORTWINDOW, window);
+            daemon_sendto(daemon, STATS_STGET, obj->pe_id,
+                    DAEMON_STATS);
+            break;
+        case STATSMAN_STREPORT:
+            pkt_putvalue(pkt, FIELD_OBJID, obj->obj_id);
+            pkt_put(pkt, FIELD_STAT, stat, var_topkt);
+            daemon_sendto(daemon, STATS_STREPORT, obj->pe_id,
+                    DAEMON_STATS);
+            break;
+    }
+    
+    
+
+    return 1;
+}
+
+/** statsman_incmd_stactack
+ */
+int statsman_incmd_stactack(cmd_t *cmd) {
+    phobj_o obj;
+    var_o stat;
+    int action;
+    app_o app;
+    int i, multiple;
+    objid_t objid;
+    varid_t statid;
+
+    obj = NULL;
+    objid = pkt_getvalue(pkt, FIELD_OBJID);
+    for (i = 0; !obj && i < Set_length(app_db); i++) {
+        app = Set_get(app_db, i);
+        assert(app);
+        obj = Set_find(app->objects, &objid, phobj_findid);
+    }
+    if (!obj) {
+        daemon_error(daemon, "Can't find object %d",objid);
+        return -1;
+    }
+    
+    statid = pkt_getvalue(pkt, FIELD_STID);
+    stat = Set_find(obj->stats, &statid, var_findid);
+    if (!stat) {
+        daemon_error(daemon, "Can't find stat");
+        return -1;
+    }
+
+    if (pkt_getcmd(pkt) == STATSMAN_STVALOK) {
+        multiple = pkt_getvalue(pkt, FIELD_STREPORTSZ);
+        if (!multiple) {
+            stat = pkt_get(pkt, FIELD_STAT, var_newfrompkt);
+            if (!stat) {
+                daemon_error(daemon, "Stat info not in packet");
+                return -1;
+            }
+
+        }
+    }
+
+    switch (pkt_getcmd(pkt)) {
+        case STATSMAN_STVALOK:
+            if (!multiple) {
+                pkt_clear(pkt);
+                pkt_put(pkt, FIELD_STAT, stat, var_topkt);
+                var_delete(&stat);
+                daemon_sendto(daemon, CMDMAN_STVALOK, 0, DAEMON_CMDMAN);
+            } else {
+                stat = var_new(multiple * pkt_getvalue(pkt, FIELD_STSIZE), pkt_getvalue(pkt, FIELD_STTYPE));
+                if (!stat) {
+                    daemon_error(daemon, "Error creating stat");
+                    return -1;
+                }
+                var_setvalue(stat, pkt_getptr(pkt, FIELD_STREPORTVALUE), multiple * pkt_getvalue(pkt, FIELD_STSIZE));
+                stat->tstamp = pkt_getvalue(pkt, FIELD_STREPORTTSVEC);
+                pkt_clear(pkt);
+                pkt_put(pkt, FIELD_STAT, stat, var_topkt);
+                var_delete(&stat);
+                daemon_sendto(daemon, CMDMAN_STVALOK, 0, DAEMON_CMDMAN);
+            }
+            break;
+        case STATSMAN_STVALERR:
+            pkt_clear(pkt);
+            daemon_sendto(daemon, CMDMAN_STVALERR, 0, DAEMON_CMDMAN);
+            break;
+
+        case STATSMAN_STSETOK:
+            pkt_clear(pkt);
+            pkt_put(pkt, FIELD_STAT, stat, var_topkt);
+            daemon_sendto(daemon, CMDMAN_STSETOK, 0, DAEMON_CMDMAN);
+            break;
+        case STATSMAN_STSETERR:
+            pkt_clear(pkt);
+            daemon_sendto(daemon, CMDMAN_STSETERR, 0, DAEMON_CMDMAN);
+            break;
+
+        case STATSMAN_STREPORTOK:
+            action = pkt_getvalue(pkt, FIELD_STREPORTACT);
+
+            if (action) {
+                if (!var_getlog(stat)) {
+                    sprintf(log_name, "%s/%s/%s.%s.stat", BASE_REPORT_PATH, str_str(obj->appname), str_str(obj->objname), str_str(stat->name));
+                    var_setlog(stat, log_new(stat->id, log_name));
+                    if (!var_getlog(stat)) {
+                        daemon_error(daemon, "Can't create resource for %s", str_str(obj->objname));
+                        pkt_putvalue(pkt, FIELD_STREPORTACT, action);
+                        daemon_sendto(daemon, STATS_STREPORT, pkt_getsrcpe(pkt), DAEMON_STATS);
+                        daemon_sendto(daemon, CMDMAN_STREPORTERR, 0, DAEMON_CMDMAN);
+                        return 0;
+                    }
+                } else {
+                    daemon_info(daemon, "Report file already created.");
+                }
+            } else {
+                log_o log = var_getlog(stat);
+                if (log) {
+                    log_delete(&log);
+                    var_setlog(stat, log);
+                } else {
+                    daemon_error(daemon, "No log found for stat %s object 0x%x\n", str_str(stat->name), obj->obj_id);
+                }
+            }
+            daemon_sendto(daemon, CMDMAN_STREPORTOK, 0, DAEMON_CMDMAN);
+            break;
+        case STATSMAN_STREPORTERR:
+            daemon_sendto(daemon, CMDMAN_STREPORTERR, 0, DAEMON_CMDMAN);
+            break;
+    }
+
+    return 1;
+}
+
+/** statsman_incmd_pmget
+ */
+int statsman_incmd_pmget(cmd_t *cmd) {
+    phobj_o obj;
+    var_o param;
+    varid_t pm_id;
+    str_o pm_name;
+    app_o app;
+    int i,j;
+    objid_t objid;
+    
+    obj = NULL;
+    objid = pkt_getvalue(pkt,FIELD_OBJID);
+    for (i = 0; !obj && i < Set_length(app_db); i++) {
+        app = Set_get(app_db, i);
+        assert(app);
+        obj = Set_find(app->objects, &objid, phobj_findid);
+    }
+    if (!obj) {
+        daemon_error(daemon, "Can't find object 0x%x",objid);
+        daemon_sendto(daemon, STATS_PMVALERR, pkt_getsrcpe(pkt),
+                DAEMON_STATS);
+        return 0;
+    }
+
+    pm_name = pkt_get(pkt, FIELD_PMNAME, str_newfrompkt);
+    if (!pm_name) {
+        daemon_error(daemon, "Invalid packet. Missing param name");
+        daemon_sendto(daemon, STATS_PMVALERR, pkt_getsrcpe(pkt), DAEMON_STATS);
+        return 0;
+    }
+
+    param = Set_find(obj->params, pm_name, var_findname);
+    if (!param) {
+        #ifdef DEB
+        daemon_error(daemon, "Can't find parameter %s object %s %d params",str_str(pm_name),str_str(obj->objname),Set_length(obj->params));
+        #endif
+        str_delete(&pm_name);
+        daemon_sendto(daemon, STATS_PMVALERR, pkt_getsrcpe(pkt),
+                DAEMON_STATS);
+        return 0;
+    }
+
+    str_delete(&pm_name);
+
+/*	printf("sw_daemons/src/statsman/statsman_cmds.c: pkt_getvalue(pkt, FIELD_PMTYPE)=%d,  var_type(param)=%d\n", 
+//			(vartype_t) pkt_getvalue(pkt, FIELD_PMTYPE), var_type(param));
+*/
+
+	printf("statsman_cmds.c: Object=%s, Parameter=%s\n", str_str(obj->objname),str_str(param->name));
+	printf("pkt_getvalue(pkt, FIELD_PMTYPE)=%d,  var_type(param)=%d\n", 
+			(vartype_t) pkt_getvalue(pkt, FIELD_PMTYPE), var_type(param));
+
+
+
+    if ((vartype_t) pkt_getvalue(pkt, FIELD_PMTYPE) != var_type(param)) {
+		printf("\nERROR in sw_daemons/src/statsman/statsman_cmds.c: Object=%s, Parameter=%s\n", str_str(obj->objname),str_str(param->name));
+		printf("pkt_getvalue(pkt, FIELD_PMTYPE)=%d,  var_type(param)=%d\n", 
+			(vartype_t) pkt_getvalue(pkt, FIELD_PMTYPE), var_type(param));
+		
+        daemon_error(daemon, "Object %s requested a different type of saved one for parameter %s.\n\n",
+        		str_str(obj->objname),str_str(param->name));
+        daemon_sendto(daemon, STATS_PMVALERR, pkt_getsrcpe(pkt),
+                DAEMON_STATS);
+        return 0;
+    }
+
+    pm_id = (varid_t) pkt_getvalue(pkt, FIELD_PMID);
+
+    pkt_clear(pkt);
+
+    pkt_putvalue(pkt, FIELD_OBJID, obj->obj_id);
+    param->id = pm_id;
+    pkt_put(pkt, FIELD_PARAM, param, var_topkt);
+
+    #ifdef DEB
+    daemon_info(daemon, "Param %s:%s\n",str_str(obj->objname),str_str(param->name));
+    #endif
+
+    daemon_sendto(daemon, STATS_PMVALOK, pkt_getsrcpe(pkt),
+            DAEMON_STATS);
+
+    return 1;
+}
+
+/** statsman_incmd_logwrite
+ */
+int statsman_incmd_logwrite(cmd_t *cmd) {
+    phobj_o obj;
+    log_o log;
+    app_o app;
+    int i;
+    objid_t objid;
+    varid_t logid;
+
+    obj = NULL;
+    objid = pkt_getvalue(pkt, FIELD_OBJID);
+    for (i = 0; !obj && i < Set_length(app_db); i++) {
+        app = Set_get(app_db, i);
+        assert(app);
+        obj = Set_find(app->objects, &objid, phobj_findid);
+    }
+    if (!obj) {
+        daemon_error(daemon, "Can't find object 0x%x", objid);
+        printf("-- current objects are --\n");
+        for (i = 0; i < Set_length(app->objects); i++) {
+            obj = Set_get(app->objects, i);
+            printf("0x%x,", obj->obj_id);
+        }
+        printf("\n");
+        return 0;
+    }
+    
+    logid = pkt_getvalue(pkt, FIELD_LOGID);
+    log = Set_find(obj->logs, &logid, log_findid);
+    if (!log) {
+        daemon_error(daemon, "Log %d does not exists.", logid);
+        return -1;
+    }
+
+    log_Write(log, pkt_getptr(pkt, FIELD_LOGTXT));
+
+    return 1;
+
+}
+
+/** statsman_incmd_streportvalue
+ */
+int statsman_incmd_streportvalue(cmd_t *cmd) {
+    phobj_o obj;
+    var_o stat;
+    app_o app;
+    int i;
+    objid_t objid;
+    varid_t varid;
+
+    obj = NULL;
+    objid = pkt_getvalue(pkt, FIELD_OBJID);
+    for (i = 0; !obj && i < Set_length(app_db); i++) {
+        app = Set_get(app_db, i);
+        assert(app);
+        obj = Set_find(app->objects, &objid, phobj_findid);
+    }
+    if (!obj) {
+        daemon_error(daemon, "Can't find object 0x%x", objid);
+        return -1;
+    }
+    
+    varid = pkt_getvalue(pkt, FIELD_STID);
+    stat = Set_find(obj->stats, &varid, var_findid);
+    if (!stat) {
+        daemon_error(daemon, "Stat %d does not exists.", varid);
+        return -1;
+    }
+
+    int *x = pkt_getptr(pkt, FIELD_STREPORTVALUE);
+    int *y = pkt_getptr(pkt, FIELD_STREPORTTSVEC);
+
+    log_Write_var(var_getlog(stat), pkt_getvalue(pkt, FIELD_STTYPE), pkt_getvalue(pkt, FIELD_STSIZE),
+            x, y, pkt_getvalue(pkt, FIELD_STREPORTSZ));
+    return 1;
+
+}
+
+
+

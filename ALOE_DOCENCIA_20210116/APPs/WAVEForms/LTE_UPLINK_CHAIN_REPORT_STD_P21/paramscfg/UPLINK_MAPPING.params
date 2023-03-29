@@ -1,0 +1,87 @@
+#------------------------------------------------------------------
+#opMODE Options: 0-DMRS_ONLY, NO_SRS, 1: SRS_ALSO
+parameter {
+	name = opMODE
+	value = 0
+}
+###################################################################
+## 
+## // Go to http://niviuk.free.fr/lte_srs.php for details. (visited 9-18-19)
+##
+# cellBwMHz Options: 1.4, 3.0, 5.0, 10.0, 15.0, 20.0 MHz
+parameter {
+	name = cellBwMHz
+	value = 3.0
+}
+#------------------------------------------------------------------
+# Csrs: SRS Bandwidth config. Options: 0, 1, 2, 3, 4, 5, 6, 7
+parameter {
+	name = Csrs
+	value = 0
+}
+#------------------------------------------------------------------
+# SubConfsrs: SRS subframe config. Options: 0-15
+parameter {
+	name = SubConfsrs
+	value = 9
+}
+#------------------------------------------------------------------
+# Bsrs: SRS bandwidth. Options: 0-3
+parameter {
+	name = Bsrs
+	value = 0
+}
+#------------------------------------------------------------------
+# nRRC: Frequency domain position. Options: 1-23
+parameter {
+	name = nRRC
+	value = 0
+}
+#------------------------------------------------------------------
+# Isrs: SRS configuration index. Options: 
+parameter {
+	name = Isrs
+	value = 0
+}
+#------------------------------------------------------------------
+# kTC: comb. Options: 0, 1 
+parameter {
+	name = kTC
+	value = 0
+}
+###################################################################
+# BitsperSymbQAM: options: 1-BPSK, 2-4QAM, 4-16QAM, 6-64QAM, 8-256QAM 
+parameter {
+	name = BitsperSymbQAM
+	value = 4
+}
+###################################################################
+#dataPeriod: Define the period of a perdiodicall ask for data to 
+#            data_source_sink module.
+parameter {
+	name = dataPeriod
+	value = 14
+}
+#------------------------------------------------------------------
+# delayTOask: Define the number of time slots to wait before 
+# 			  initiating the periodic call for data.
+parameter {
+	name = delayTOask
+	value = 0
+}
+#------------------------------------------------------------------
+# NofDataSampl2ask: Define the number of bytes to ask for.
+parameter {
+	name = NofDataSampl2ask
+	value = 233
+}
+###################################################################
+#------------------------------------------------------------------
+# RBsAssigned: 1-Indicates the RB assigned
+# 			   The selected format requires to start with RBs:list of RBs separeated by comma.
+# Not available
+parameter {
+	name = RBsAssigned
+	value = RBs:0,1,2,3
+}
+

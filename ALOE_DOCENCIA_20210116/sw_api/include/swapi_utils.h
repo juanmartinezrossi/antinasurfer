@@ -1,0 +1,189 @@
+/*
+ * swapi_utils.h
+ *
+ * Copyright (c) 2009 Ismael Gomez-Miguelez, UPC <ismael.gomez at tsc.upc.edu>. All rights reserved.
+ *
+ *
+ * This file is part of ALOE.
+ *
+ * ALOE is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * ALOE is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with ALOE.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#ifndef _SWAPI_UTILS_H
+#define	_SWAPI_UTILS_H
+
+/** default string length */
+
+#define DEF_STR_LEN 128
+
+/**@defgroup utils_swapi SWAPI Skeleton structures
+ *
+ * These structures, when compiled with the default SWAPI example skeleton 
+ * are useful to easily initialize and deal with interfaces and stats/params.
+ * 
+ * To use them, you have to initialize them to any constant values and terminate
+ * the last entry with a NULL at the name field.
+ *
+ * @{
+ */
+
+/** Structure for logic interfaces
+ *
+ * Regardless the direction of the interface, the user must provide
+ * a buffer for storing data of size max_buffer_len elements of size sample_sz (in bytes).
+ *
+ * For input interfaces. Set the variable to the name input_itf:
+ *  process_fnc() will be called as soon as the required amount of
+ *  samples is available. This number is provided by the function get_block_sz()
+ *  which will be called at the beginning of every timeslot (if needed).
+ *  Setting get_block_sz() to NULL is equivalent to returning 0 from this function.
+ *  As soon as any data is available the processing function will be called.
+ *
+ * For output interfaces. Set the variable to the name output_itf:
+ *  If data needs to be generated, point get_block_sz() to a function returning
+ *  the amount of samples to be generated (you can use GetTempo to convert from
+ *  frequency to number of samples). Then, process_fnc() will be called to
+ *  generate such data.
+ *  If data is being provided synchronously to any input interface, set get_block_sz
+ *  to NULL and use SendItf() function to send the data.
+ *
+ * Example:
+ *
+ * Configure an input interface which can process any amount of samples (not block oriented)
+ *
+ *  typedef int input1_t;
+ *
+ *  struct utils__itf input_itfs[] = {
+ *                   {"myInputInterface",
+ *                   sizeof(input1_t),
+ *                   1024,
+ *                   input_buffer,
+ *                   NULL,
+ *                   process_input},
+ *
+ *                   {NULL, 0, 0, 0, 0, 0}};
+ *
+ *
+ */
+struct utils_itf {
+	char *name;                     /**<< Name of the interface */
+    int sample_sz;                  /**<< Size of the sample, in bytes */
+	int max_buffer_len;             /**<< Max buffer length in samples */
+	void *buffer;                   /**<< Buffer where to store data */
+    int (*get_block_sz) ();         /**<< Returns number of samples to read/generate. Returning <0 interrupts execution*/
+	int (*process_fnc) (int);	/**<< Function to process/generate data. Returning 0 interrupts execution */
+};
+
+/** Default interface data type for bitstream
+ */
+typedef unsigned char bitstream_t;
+
+/*AGBJAN19 INICI*/
+/*SK18*/
+struct itf_info {
+	int sample_type;								/*TYPE_CHAR, TYPE_SHORT, TYPE_INT, TYPE_FLOAT, TYPE_COMPLEX*/
+  	int sample_sz;                  /*<< Size of the sample, in bytes*/
+	int max_buffer_len;             /*<< Max buffer length in samples*/
+};
+
+/*AGBJAN19 FI*/
+
+struct utils_param {
+	char *name;             /**< Name of the parameter */
+	int type;              /**< Type of the parameter*/
+	int size;               /**< Size of the parameter value */
+	void *value;            /**< Pointer to the value to obtain.
+                                        Make sure the buffer is big enough (len) */
+};
+
+enum stat_update {OFF, READ, WRITE};
+
+/** Structure for statistics
+ *
+ * You can automatically initialize a variable if you set the configuration
+ * in this structure.
+ * The id of the initialized variable is stored in the id pointer and you can
+ * also initialize the variable with a value if the pointer value is set to any
+ * non-NULL value.
+ *
+ * Set update_mode to READ to automatically read the contents of the variable
+ * at the beggining of every timeslot (with the contents at value with fixed length size).
+ *
+ * Set update_mode to WRITE to automatically set the contents of the variable
+ * at the end of every timeslot (with the contents at value with fixed length size).
+ */
+struct utils_stat {
+	char *name;                     /**< Name of the variable */
+    int type;                      /**< Type of the variable */
+	int size;                       /**< Size of the variable, in elements (of type) */
+	int *id;                        /**< Pointer to store the id for the stat */
+    void *value;                    /**< Initial value for stat */
+    enum stat_update update_mode;   /**< Mode for automatically updating */
+};
+
+/** Custom Initialization function
+ * It will be called during the initialization phase, after all interfaces/params/stats
+ * have been initialized.
+ *
+ *  @return 1 OK
+ *  @return 0 error
+ */
+int InitCustom();
+
+/** Custom Run function
+ * It will be called on every timeslot after all jobs/data have been dispatched
+ *
+ * @return 1 OK
+ * @return 0 error
+ */
+int RunCustom();
+
+/** Send data through interface
+ *
+ * Send data through the configured interface with index idx. The data will be
+ * read from the buffer provided on the configuration structure.
+ *
+ * @param idx Index of the interface in the structure logic_itf
+ * @param len Number of samples to send, of the size configured in the structure logic_itf
+ * @return >=0 Samples sended
+ * @return <0 error
+ */
+int SendItf(int idx, int len);
+
+/** Config interfaces
+ *
+ * This function is called during the initialization phase, just after initializing parameters
+ * and before creating interfaces.
+ * It can be used to dynamically create different interfaces as a function of parameters
+ */
+void ConfigInterfaces(void);
+
+
+/** isItfConnected
+ * returns 1 if the interface index is connected
+ */
+int isItfConnected(int idx);
+
+struct utils_variables {
+	char *name;
+	int type;
+	int size;
+	void *value;
+	enum stat_update update_mode;
+};
+
+
+#endif	/* _SWAPI_UTILS_H */
+

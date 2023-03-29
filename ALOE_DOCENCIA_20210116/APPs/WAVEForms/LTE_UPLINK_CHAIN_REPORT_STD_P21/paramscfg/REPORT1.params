@@ -1,0 +1,17 @@
+#opMODE=0; 						//O: Normal CTRL operation, 1: Read&Print CTRL file
+parameter {
+	name = opMODE
+	value = 0
+}
+#debugg; 						//O: No debugg, 1: debugg
+parameter {
+	name = debugg
+	value = 0
+}
+
+parameter {
+	name = UserName
+	value = NameSurname1Surname2
+}
+
+

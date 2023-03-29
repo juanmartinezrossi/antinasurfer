@@ -1,0 +1,9 @@
+AUTOMAKE_OPTIONS = subdir-objects
+
+lib_LIBRARIES = lib/libaloeSK15.a
+lib_libaloeSK15_a_CFLAGS = -ansi -fPIC
+lib_libaloeSK15_a_CPPFLAGS = -I../include	-I../../../../sw_api/include -I../../../../hw_api/lnx/include -I../../../../utils/include
+lib_libaloeSK15_a_SOURCES = ../src/paramsSK15.c ../src/skeletonSK15.c					
+#lib_libaloeSK15_a_LIBADD = -lrt 
+
+EXTRA_DIST=../include/*.h 

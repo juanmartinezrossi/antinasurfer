@@ -1,0 +1,60 @@
+###################################################################
+#define NOEQUAL_NORS			0	// NO EQUALIZATION: NO Sounding Reference Signal, DELETE DMRS ONLY
+#define EQUAL_NORS				1	// EQUALIZATION: NO Sounding Reference Signal
+parameter {
+	name = opMODE
+	value = 1
+}
+###################################################################
+#Options: 	1400000.0, 3000000.0, 	
+#		
+parameter {
+	name = cellBwMHz
+	value = 3000000.0
+}
+###################################################################
+#------------------------------------------------------------------
+# Csrs: SRS Bandwidth config. Options: 0, 1, 2, 3, 4, 5, 6, 7
+parameter {
+	name = Csrs
+	value = 0
+}
+#------------------------------------------------------------------
+# SubConfsrs: SRS subframe config. Options: 0-15
+parameter {
+	name = SubConfsrs
+	value = 9
+}
+#------------------------------------------------------------------
+# Bsrs: SRS bandwidth. Options: 0-3
+parameter {
+	name = Bsrs
+	value = 0
+}
+#------------------------------------------------------------------
+# nRRC: Frequency domain position. Options: 1-23
+parameter {
+	name = nRRC
+	value = 0
+}
+#------------------------------------------------------------------
+# Isrs: SRS configuration index. Options: 
+parameter {
+	name = Isrs
+	value = 0
+}
+#------------------------------------------------------------------
+# kTC: comb. Options: 0, 1 
+parameter {
+	name = kTC
+	value = 0
+}
+###################################################################
+#------------------------------------------------------------------
+# RBsAssigned: 1-Indicates the RB assigned
+# 			   The selected format requires to start with RBs:list of RBs separeated by comma.
+parameter {
+	name = RBsAssigned
+	value = RBs:0,1,2,3
+}
+

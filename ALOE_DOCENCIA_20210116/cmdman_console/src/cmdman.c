@@ -1,0 +1,727 @@
+/*
+ * cmdman.c
+ *
+ * Copyright (c) 2009 Ismael Gomez-Miguelez, UPC <ismael.gomez at tsc.upc.edu>. All rights reserved.
+ *
+ * This file is part of ALOE.
+ *
+ * ALOE is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * ALOE is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with ALOE.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <signal.h>
+#include <errno.h>
+#include <string.h>
+#include <sched.h>
+#include <time.h>
+#include <ctype.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <fcntl.h>
+#define __USE_GNU
+#include <ucontext.h>
+#include <execinfo.h>
+
+#include <readline/readline.h>
+#include <readline/history.h>
+
+
+#include <sys/msg.h>
+
+#include "phal_hw_api.h"
+#include "phid.h"
+#include "set.h"
+#include "strdata.h"
+#include "cmdman_backend.h"
+#include "cmdman_cmds.h"
+#include "net_utils.h"
+/*AGB NOV15*/
+#include <sys/time.h>
+#include <time.h>
+
+
+#define HISTORY_FILE "~/.phal_history"
+
+#define DEFAULT_PORT 	1100
+#define IN_LINE_LEN	1024
+#define OUTPUT_SEQUENCE "!*!*!*!*!"
+
+/*AGB NOV15*/
+//#define AUTO_LOAD_APP
+
+#ifdef AUTO_LOAD_APP
+char *wave_name = "benchmark2M";	//AGB OCT14: To load benchmark2M app. 
+#endif 
+
+char str[IN_LINE_LEN], oline[IN_LINE_LEN], lline[IN_LINE_LEN];
+
+int _goout(char *x, int a, strdata_o strdata, char print);
+int _help(char *x, int a, strdata_o strdata, char print);
+void stripcarrier(char *s);
+int execute_line(char *line, int in_fd, int out_fd);
+
+int done = 0;
+
+/* indicates wether we have to open input sockets (-l option) */
+int do_in_socket = 0;
+
+/* show prompt and listen for local input command. By default is true unless we are 
+ * connecting to a remote console (in the future, enabling this will allow cascade-like consoles)
+ */
+int do_prompt = 1;
+
+/* execute received commands or not. By default is true unless we are
+ * connecting to a remote console (in the future, enabling this will allow cascade-like consoles)
+ */
+int do_exec = 1;
+
+/* input file descriptor and socket for remote consoles (just used if do_in_socket is true) */
+int in_fd = 0, in_sock = 0;
+
+/* output fd for remote connections (just used if connecting to remote consoles but could be 
+ * used in the future to enable cascading consoles) 
+ */
+int out_fd = 0;
+
+strdata_o strdata = NULL;
+
+typedef int (cmd_func_t) (char*, int, strdata_o, char);
+
+typedef struct {
+    char *name;
+    cmd_func_t *func;
+    char *doc;
+} COMMAND;
+
+COMMAND commands[] = {
+    {
+        "help", _help, "Display this text"
+    },
+    {
+        "load", _loadapp, "Load application.\tUsage: load app_name"
+    },
+    {
+        "run", _runapp, "Run application.\tUsage: run app_name q-factor"
+    },
+    {
+        "init", _initapp, "Init application.\tUsage: init app_name"
+    },
+    {
+        "pause", _pauseapp, "Pause application.\tUsage: pause app_name"
+    },
+    {
+    	"step", _stepapp, "Step application.\tUsage: step app_name"
+    },
+    {
+        "stop", _stopapp, "Stop application.\tUsage: stop app_name"
+    },
+    {
+        "statlist", _statlist, "List statistics.\tUsage: statlist app_name [obj_name]"
+    },
+    {
+        "statset", _statset, "Modify statistic.\tUsage: statset app_name obj_name stat_name new_value"
+    },
+    {
+        "statget", _statget, "Get a statistic value.\tUsage: statget app_name obj_name stat_name"
+    },
+    {
+        "statreport", _statreport, "Start/stop report.\tUsage: statreport start/stop app_name obj_name stat_name window_len period"
+    },
+    {
+        "applist", _applist, "List applications.\tUsage: applist"
+    },
+    {
+        "pelist", _pelist, "List PE in platform.\tUsage: pelist"
+    },
+    {
+        "execreport", _execreport, "Start/Stop EXEC reps. \tUsage: execreport app_name start/stop"
+    },
+    {
+        "execlog", _execlog, "Start/Stop EXEC logs. \tUsage: execlog app_name start/stop"
+    },
+    {
+        "execinfo", _execinfo, "Exec information. \tUsage execinfo app_name [obj_name]"
+    },
+    {
+        "exit", _goout, "Exit this program"
+    },
+    {NULL, NULL, NULL}
+};
+
+COMMAND *find_command();
+
+char *stripwhite();
+void print_frame(char *title);
+
+char * dupstr(char *s)
+{
+    char *r;
+
+    r = malloc(strlen(s) + 1);
+    strcpy(r, s);
+    return (r);
+}
+
+void printstr(int fd, char *s)
+{
+    if (!fd)
+        fd = 1;
+    write(fd, s, strlen(s) + 1);
+
+}
+
+char *command_generator __P((const char *, int));
+char **fileman_completion __P((const char *, int, int));
+void cmdman_alloc();
+
+/* Tell the GNU Readline library how to complete.  We want to try to
+ complete on command names if this is the first word in the line, or
+ on filenames if not. */
+void initialize_readline()
+{
+    /* Allow conditional parsing of the ~/.inputrc file. */
+    rl_readline_name = "RunPH";
+
+    /* Tell the completer that we want a crack first. */
+    rl_attempted_completion_function = fileman_completion;
+}
+
+/* Attempt to complete on the contents of TEXT.  START and END
+ bound the region of rl_line_buffer that contains the word to
+ complete.  TEXT is the word to complete.  We can use the entire
+ contents of rl_line_buffer in case we want to do some simple
+ parsing.  Returnthe array of matches, or NULL if there aren't any. */
+char ** fileman_completion(text, start, end)
+const char *text;
+int start, end;
+{
+    char **matches;
+
+    matches = (char **) NULL;
+
+    /* If this word is at the start of the line, then it is a command
+     to complete.  Otherwise it is the name of a file in the current
+     directory. */
+    if (start == 0)
+        matches = rl_completion_matches(text, command_generator);
+
+    return (matches);
+}
+
+/* Generator function for command completion.  STATE lets us
+ know whether to start from scratch; without any state
+ (i.e. STATE == 0), then we start at the top of the list. */
+char * command_generator(text, state)
+const char *text;
+int state;
+{
+    static int list_index, len;
+    char *name;
+
+    /* If this is a new word to complete, initialize now.  This
+     includes saving the length of TEXT for efficiency, and
+     initializing the index variable to 0. */
+    if (!state) {
+        list_index = 0;
+        len = strlen(text);
+    }
+
+    /* Return the next name which partially matches from the
+     command list. */
+    while ((name = commands[list_index].name)) {
+        list_index++;
+
+        if (strncmp(name, text, len) == 0)
+            return (dupstr(name));
+    }
+
+    /* If no names matched, then return NULL. */
+    return ((char *) NULL);
+}
+
+/*************
+ *   USAGE   *
+ *************/
+void usage(char *prog)
+{
+    printf("%s [-c ip_address:port] [-l port] [-d]\n", prog);
+    printf("\n\t[-c] Connect to a remote ip_address:port. Default port: %d\n",
+            DEFAULT_PORT);
+    printf("\n\t[-l] Create an input tcp socket at the specified port. Default port: %d\n",
+            DEFAULT_PORT);
+    printf("\n\t[-d] Run as daemon. Do not show prompt.\n");
+    printf("\n\nNote: When launching with -c and -l parameters acts as a bridge.\n");
+    exit(0);
+}
+
+#define MAX_CHILDS	20
+
+struct childs {
+    int pid;
+    int fd;
+};
+
+struct childs childs[MAX_CHILDS];
+
+void sig_chld(int sig, siginfo_t * sinfl, void *v)
+{
+    int i;
+
+    for (i = 0; i < MAX_CHILDS; i++) {
+        if (childs[i].pid) {
+            if (waitpid(childs[i].pid, NULL, WNOHANG) > 0) {
+                close(childs[i].fd);
+                memset(&childs[i], 0, sizeof (struct childs));
+            }
+        }
+    }
+}
+
+#ifdef AUTO_LOAD_APP
+char* autoloadwave(char *wavename){
+
+    int length, m;
+    char *lineA = "load"; 	
+    char *lineB = "init";	
+    char *lineC = "run";	
+    char *line;
+    static int times=0;
+
+	sleep_us(5000);
+	if(times>=0 && wavename){
+		line=malloc(sizeof(char)*64);
+		if(times==0)strcpy(line, lineA);		
+		if(times==1)strcpy(line, lineB);
+		if(times==2)strcpy(line, lineC);
+		strcat(line, " ");
+		strcat(line, wavename);
+		times++;
+		if(times == 3){
+			times=-1;
+		}
+	}else line = readline("runph$: ");
+	return(line);
+}
+#endif 
+
+
+/************
+ *   MAIN   *
+ ************/
+int main(int argc, char **argv)
+{
+    char *line, *s;
+    int i, n, pid;
+
+    char *ip;
+    char *cport;
+    int port = -1;
+    struct sigaction action;
+
+    do_prompt = 1;
+
+    if (read_history(NULL)) {
+        perror("read history");
+    }
+
+    memset(childs, 0, sizeof (struct childs));
+
+    /*Capture SIGCHLD signals */
+    action.sa_sigaction = sig_chld;
+    action.sa_flags = SA_SIGINFO;
+    sigemptyset(&action.sa_mask);
+    if (sigaction(SIGCHLD, &action, NULL) < 0) {
+        perror("sigaction");
+        exit(-1);
+    }
+
+    for (i = 1; i < argc; i++) {
+        switch (argv[i][1]) {
+        case 'c':
+            if (do_in_socket) {
+                printf("Cascade consoles not yet supported\n");
+                exit(0);
+            }
+            if (argc > i + 1) {
+                i++;
+                ip = argv[i];
+            } else {
+                printf("Argument -c needs a remote ip address\n");
+                usage(argv[0]);
+            }
+            cport = strstr(ip, ":");
+            if (cport) {
+                *cport = '\0';
+                cport++;
+                port = atoi(cport);
+            }
+            if (port < 1) {
+                port = DEFAULT_PORT;
+            }
+            //			printf("Creating output socket to %s:%d...\n", ip, port);
+            out_fd = setup_client(inet_addr(ip), port,0);
+            if (out_fd > 0) {
+                //				printf("Connected.\n");
+            } else {
+                exit(-1);
+            }
+            do_in_socket = 0;
+            do_exec = 0;
+            break;
+        case 'l':
+            if (out_fd) {
+                printf("Cascade consoles not yet supported\n");
+                exit(0);
+            }
+            ip = "0.0.0.0";
+            if (argc > i + 1) {
+                if (argv[i + 1][0] != '-') {
+                    i++;
+                    cport = argv[i];
+                    if (port) {
+                        port = atoi(cport);
+                    }
+                }
+            }
+            if (port < 1) {
+                port = DEFAULT_PORT;
+            }
+            do_in_socket = 1;
+            do_exec = 1;
+            //			printf("Listening to input sockets at port %d\n", port);
+            break;
+        case 'd':
+            do_prompt = 0;
+            break;
+        case 'h':
+            usage(argv[0]);
+            exit(0);
+        }
+    }
+
+    if (do_exec) {
+        if (!cmdman_init()) {
+            printf("\nCMDMAN: Error initiating CMDMAN BACKEND\n");
+            exit(-1);
+        }
+        sleep_ms(500);
+    } else {
+        hwapi_mem_init();
+        cmdman_alloc();
+    }
+    hwapi_mem_silent(1);
+
+    strdata = strdata_new();
+    if (!strdata) {
+        printf("Error initiating.\n");
+        exit(0);
+    }
+
+    if (do_prompt) {
+        fflush(stdout);
+        printf("\n\n");
+        print_frame("ALOE Command Manager");
+        printf("\n\nEnter Commands.\nType 'help' for available commands.\n\n");
+    }
+
+    /* create a child to create input sockets childs if we need to run local commands too */
+    int prompt_socket = 0;
+    if (do_in_socket && do_prompt) {
+        prompt_socket = fork();
+    }
+
+    if (!prompt_socket) {
+        /* childs for input sockets are created here */
+        while (do_in_socket) {
+            /* find a free space at childs db*/
+            i = 0;
+            while (i < MAX_CHILDS && childs[i].pid)
+                i++;
+            if (i == MAX_CHILDS) {
+                printf("Error can't create more connections\n");
+                exit(0);
+            }
+
+            //			printf("Wating for input connection at port %d...\n", port); fflush(stdout);
+            in_fd = setup_server(inet_addr(ip), port, &in_sock,0);
+            if (in_fd < 0) {
+                printf("Error creating input socket\n");
+                exit(-1);
+            }
+
+            pid = fork();
+            if (pid < 0) {
+                perror("Error forking");
+                exit(-1);
+            }
+            if (!pid)
+                break;
+
+            childs[i].pid = pid;
+            childs[i].fd = in_fd;
+        }
+    }
+    if (do_prompt) {
+        fflush(stdout);
+        initialize_readline();
+    }
+//AGB NOV15
+#ifdef AUTO_LOAD_APP
+	    sleep_us(500000);
+#endif
+    s = "";
+    line = NULL;
+    while (!done) {
+        if (do_prompt) {
+            fflush(stdout);
+            if (line) {
+                free(line);
+            }
+//AGB NOV15
+#ifdef AUTO_LOAD_APP
+			line=autoloadwave(wave_name);
+#else
+            line = readline("runph$: ");
+#endif
+            if (line) {
+                s = stripwhite(line);
+                if (*s) {
+                    add_history(s);
+                    if (write_history(NULL)) {
+                        perror("write history");
+                    }
+                }
+                n = 1;
+            }
+        }
+        if (in_fd) {
+            n = read(in_fd, lline, IN_LINE_LEN);
+            if (n <= 0) {
+                done = 1;
+            } else {
+                s = lline;
+            }
+        }
+        if (n > 0 && *s && !done) {
+            stripcarrier(s);
+            execute_line(s, in_fd, out_fd);
+        }
+    }
+    if (out_fd) {
+        close(out_fd);
+    }
+
+    exit(0);
+
+}
+
+void stripcarrier(char *s)
+{
+    char *d;
+    d = strstr(s, "\n");
+    if (d) {
+        *d = '\0';
+    }
+    d = strstr(s, "\r");
+    if (d) {
+        *d = '\0';
+    }
+}
+
+int _help(char *x, int answer, strdata_o strdata, char do_print)
+{
+    register int i;
+    int printed = 0;
+    char *t;
+
+    if (!do_print)
+        return 1;
+
+    for (i = 0; commands[i].name; i++) {
+        if (!*x || (strcmp(x, commands[i].name) == 0)) {
+            if (strlen(commands[i].name) < 8)
+                t = "\t\t";
+            else
+                t = "\t";
+            printf("%s%s%s.\n", commands[i].name, t,
+                    commands[i].doc);
+            printed++;
+        }
+    }
+
+    if (!printed) {
+        sprintf(str, "No commands match `%s'.  Possibilties are:\n", x);
+        printstr(in_fd, str);
+
+        for (i = 0; commands[i].name; i++) {
+            /* Print in six columns. */
+            if (printed == 6) {
+                printed = 0;
+                printf("\n");
+            }
+
+            printf("%s\t", commands[i].name);
+            printed++;
+        }
+
+        if (printed)
+            printf("\n");
+    }
+    return (0);
+
+}
+
+int _goout(char *x, int a, strdata_o strdata, char print)
+{
+    done = 1;
+    return 0;
+}
+
+int _caller(char *x, int in_fd, int out_fd, char *cmd, cmd_func_t *func)
+{
+    int n, k;
+    char *b;
+
+    if (!out_fd) {
+        if (!in_fd) {
+            n = func(x, PARAM_EXEC, NULL, 1);
+        } else {
+            strdata_clear(strdata);
+            n = func(x, PARAM_EXEC, strdata, 0);
+            k = htonl(n);
+            write(in_fd, &k, sizeof (int));
+            strdata_write(strdata, in_fd);
+            fflush(stdout);
+        }
+    } else {
+        write(out_fd, cmd, strlen(cmd) + 1);
+        read(out_fd, &n, sizeof (int));
+        n = ntohl(n);
+        strdata_read(strdata, out_fd);
+        if (!in_fd) {
+            func(x, n, strdata, 1);
+        } else {
+            k = htonl(n);
+            write(in_fd, &k, sizeof (int));
+
+            strdata_write(strdata, in_fd);
+            fflush(stdout);
+        }
+        strdata_clear(strdata);
+    }
+
+    if (!in_fd && n == ERROR_PARAMS) {
+        printf("CMDMAN: Error in command. Invalid parameters.\n");
+        b = strstr(cmd, " ");
+        if (b) {
+            *b = '\0';
+        }
+        _help(cmd, 0, 0, 0);
+    }
+    return 1;
+}
+
+/* Execute a command line. */
+int execute_line(char *line, int in_fd, int out_fd)
+{
+    register int i;
+    COMMAND *command;
+    char *word;
+
+    strcpy(oline, line);
+
+    /* Isolate the command word. */
+    i = 0;
+    while (line[i] && whitespace(line[i]))
+        i++;
+    word = line + i;
+
+    while (line[i] && !whitespace(line[i]))
+        i++;
+
+    if (line[i])
+        line[i++] = '\0';
+
+    command = find_command(word);
+
+    if (!command) {
+        fprintf(stderr, "%s: No such command.\n", word);
+        return (-1);
+    }
+
+    /* Get argument to command, if any. */
+    while (whitespace(line[i]))
+        i++;
+
+    word = line + i;
+
+    /* Call the function. */
+    return _caller(word, in_fd, out_fd, oline, command->func);
+    //	return ((*(command->func))(word, in_fd, out_fd));
+}
+
+/* Look up NAME as the name of a command, and return a pointer to that
+ command.  Return a NULL pointer if NAME isn't a command name. */
+COMMAND * find_command(name)
+char *name;
+{
+    register int i;
+
+    for (i = 0; commands[i].name; i++)
+        if (strcmp(name, commands[i].name) == 0)
+            return (&commands[i]);
+
+    return ((COMMAND *) NULL);
+}
+
+/* Strip whitespace from the start and end of STRING.  Return a pointer
+ into STRING. */
+char * stripwhite(string)
+char *string;
+{
+    register char *s, *t;
+
+    for (s = string; whitespace(*s); s++)
+        ;
+
+    if (*s == 0)
+        return (s);
+
+    t = s + strlen(s) - 1;
+    while (t > s && whitespace(*t))
+        t--;
+    *++t = '\0';
+
+    return s;
+}
+
+/* **************************************************************** */
+
+void print_frame(char *title)
+{
+    printf("======================================\n");
+    printf("-= %s =-\n", title);
+    printf("======================================\n");
+
+}

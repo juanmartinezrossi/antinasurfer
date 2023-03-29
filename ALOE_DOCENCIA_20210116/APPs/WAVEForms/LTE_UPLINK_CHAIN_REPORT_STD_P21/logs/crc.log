@@ -1,0 +1,29 @@
+
+[000]:	Caution parameter mode not initated
+
+[000]:	Caution parameter longblock not initated
+
+[000]:	Caution parameter longcrc not initated
+
+[000]:	Caution parameter numblocks not initated
+
+[000]:	Caution parameter poly not initated
+
+[000]:	Caution parameter longmode not initated
+
+[000]:	Caution parameter block1size not initated
+
+[000]:	Caution parameter block2size not initated
+
+[000]:	Caution parameter errorsblk not initated
+
+[000]:	Caution parameter nof_err not initated
+
+[000]:	Caution parameter totalerrors not initated
+
+[000]:	Caution parameter fer not initated
+
+[000]:	Caution parameter totalerrors not initated
+
+[005]:	crc -> InputLength is zero (TS 4)
+[006]:	crc -> InputLength is zero (TS 5)

@@ -1,0 +1,28 @@
+# Filter always operate with complex
+# mode: 0 = BYPASS => Received input data are copied to output.
+# mode: 1 = CPLX => Read a complex coefficients FIR filter file.
+# node: 2 = REAL => Read a real coefficients FIR filter file and build complex coefficients. Uses the same coeff for real amd imag.
+parameter {
+	name = opmode
+	value = 2
+}
+#------------------------------------------------------------------
+# .coeff for text files, .coeff.bin for binary files
+#FIR_REAL.coeff
+parameter {
+	name = filtercoefffile
+	value = paramscfg/FIR_REAL.coeff.bin
+}
+#------------------------------------------------------------------
+# Ninterpol: Interpolation Number. Add N-1 zeros.
+parameter {
+	name = Ninterpol
+	value = 1
+}
+#------------------------------------------------------------------
+# Ndecimate: Decimation Number. Eliminate samples
+parameter {
+	name = Ndecimate
+	value = 1
+}
+#------------------------------------------------------------------

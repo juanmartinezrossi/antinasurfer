@@ -1,0 +1,11 @@
+AUTOMAKE_OPTIONS = subdir-objects
+OBJDIR=obj/
+
+bin_PROGRAMS = bin/dac_TXRX
+
+bin_dac_TXRX_SOURCES = ../src/dac_TXRX.c
+bin_dac_TXRX_CPPFLAGS = -I../interfaces  -I../../../sw_api/include -I../../../hw_api/lnx/include
+bin_dac_TXRX_LDADD =  -lskeleton $(hwapi) $(swapi)
+bin_dac_TXRX_LDFLAGS = -L../../typetools/lnx_make/lib/ -L../../../hw_api/lnx/lib -L../../../sw_api/lnx_make/lib
+
+EXTRA_DIST = ../interfaces/*.h ../doc/ 

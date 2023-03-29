@@ -1,0 +1,517 @@
+//
+// Copyright 2011-2012 Ettus Research LLC
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+
+#include <uhd/utils/thread_priority.hpp>
+#include <uhd/convert.hpp>
+#include <uhd/utils/safe_main.hpp>
+#include <uhd/usrp/multi_usrp.hpp>
+#include <boost/program_options.hpp>
+#include <boost/format.hpp>
+#include <boost/thread/thread.hpp>
+#include <boost/math/special_functions/round.hpp>
+#include <iostream>
+#include <complex>
+//#include <cstdlib>	//A
+#include <boost/pointer_cast.hpp>
+#include <boost/shared_ptr.hpp>
+
+#include <signal.h>
+#include <semaphore.h>
+#include <string.h>
+#include "uhd.h"
+#include "dac_cfg.h"
+
+//#define PRINT_INTERVAL
+
+/***********************************************************************
+ * Test result variables
+ **********************************************************************/
+unsigned long long num_overflows = 0;
+unsigned long long num_underflows = 0;
+unsigned long long num_rx_samps = 0;
+unsigned long long num_tx_samps = 0;
+unsigned long long num_dropped_samps = 0;
+unsigned long long num_seq_errors = 0;
+
+#define SAVE_LEN 100000
+int save_period[SAVE_LEN];
+int save_idx=0;
+
+
+/***********************************************************************
+ * Benchmark RX Rate
+ **********************************************************************/
+void benchmark_rx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &rx_cpu, const std::string &rx_otw, struct dac_cfg *cfg, void (*sync)(void), int *tslen_ptr){
+
+//	uhd::set_thread_priority_safe(); //A
+
+    double rx_rate=0;
+
+	std::cout << "benchmark_rx_rate"<< std::endl;
+
+    //create a receive streamer
+    uhd::stream_args_t stream_args(rx_cpu, rx_otw);
+    stream_args.channels.push_back(0); //single-channel
+    uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
+
+    //setup variables and allocate buffer
+    uhd::rx_metadata_t md;
+
+    std::vector<void *> buffs;
+    buffs.push_back(cfg->dacinbuff[0]); //only 1 channel is used
+    bool had_an_overflow = false;
+    uhd::time_spec_t last_time;
+    const double rate = usrp->get_rx_rate();
+
+    uhd::stream_cmd_t cmd(uhd::stream_cmd_t::STREAM_MODE_START_CONTINUOUS);
+    cmd.time_spec = usrp->get_time_now() + uhd::time_spec_t(0.05);
+    cmd.stream_now = (buffs.size() == 1);
+    usrp->issue_stream_cmd(cmd);
+    while (not boost::this_thread::interruption_requested()){
+    	/* Poll if sampling frequency has changed */
+		if (cfg->inputFreq!=rx_rate) {
+			usrp->set_rx_rate(cfg->inputFreq);
+			rx_rate=cfg->inputFreq;
+			std::cout << "Changing RX Frequency" << std::endl;
+		}
+
+	    double x=(double) cfg->NsamplesOut/rx_rate;
+	    *tslen_ptr=(int) 1000000*x;
+
+        num_rx_samps += rx_stream->recv(buffs, cfg->NsamplesIn, md);
+
+//        sync();
+
+        //handle the error codes
+        switch(md.error_code){
+        case uhd::rx_metadata_t::ERROR_CODE_NONE:
+            if (had_an_overflow){
+                had_an_overflow = false;
+                num_dropped_samps += boost::math::iround((md.time_spec - last_time).get_real_secs()*rate);
+            }
+            break;
+
+        case uhd::rx_metadata_t::ERROR_CODE_OVERFLOW:
+            had_an_overflow = true;
+            last_time = md.time_spec;
+            num_overflows++;
+            break;
+
+        default:
+            std::cerr << "Error code: " << md.error_code << std::endl;
+            std::cerr << "Unexpected error on recv, continuing..." << std::endl;
+            break;
+        }
+
+    }
+    usrp->issue_stream_cmd(uhd::stream_cmd_t::STREAM_MODE_STOP_CONTINUOUS);
+}
+
+void time_interval(struct timeval * tdata)
+{
+
+    /*First element stores the result,
+     *second element is the start time and
+     *third element is the end time.
+     */
+    tdata[0].tv_sec = tdata[2].tv_sec - tdata[1].tv_sec;
+    tdata[0].tv_usec = tdata[2].tv_usec - tdata[1].tv_usec;
+    if (tdata[0].tv_usec < 0) {
+
+        tdata[0].tv_sec--;
+        tdata[0].tv_usec += 1000000;
+    }
+}
+
+struct timeval t[3];
+double mean_interval=0;
+int ct=0;
+
+/***********************************************************************
+ * Benchmark TX Rate
+ **********************************************************************/
+void benchmark_tx_rate(uhd::usrp::multi_usrp::sptr usrp, const std::string &tx_cpu, const std::string &tx_otw, struct dac_cfg *cfg, void (*sync_ts)(void), int *tslen_ptr){
+
+    struct timeval t[3];
+   	double tx_rate=0;
+    int nsamples,n;
+
+//	uhd::set_thread_priority_safe();
+
+//	std::cout << "benchmark_tx_rate"<< std::endl;
+
+    //create a transmit streamer
+    uhd::stream_args_t stream_args(tx_cpu, tx_otw);
+    	stream_args.channels.push_back(0); // only one channel is used.
+    uhd::tx_streamer::sptr tx_stream = usrp->get_tx_stream(stream_args);
+
+    //setup variables buffer
+    uhd::tx_metadata_t md;
+    md.time_spec = usrp->get_time_now() + uhd::time_spec_t(0.05);
+    md.has_time_spec = false;
+
+    std::vector<std::complex<float> > buff(100000);
+    std::vector<std::complex<float> *> buffs(usrp->get_tx_num_channels(), &buff.front());
+
+/*	std::cout << boost::format("XXX pointer cfg->dacoutbuff[0][0]=%u") % &cfg->dacoutbuff[0][0] << std::endl;
+	std::cout << boost::format("R %3.1f") % __real__ cfg->dacoutbuff[0][0] << std::endl;
+	std::cout << boost::format("I %3.1f") % __imag__ cfg->dacoutbuff[0][0] << std::endl;
+
+*/
+//	cfg->DAC_Active = DAC_ACTIVE;
+
+//	if(cfg->DAC_Active == DAC_ACTIVE){
+//	std::cout << boost::format("XXX_AA pointer cfg->dacoutbuff[0][0]=%u") % cfg->dacoutbuff[0][0] << std::endl;
+
+	
+
+    while (not boost::this_thread::interruption_requested()){
+
+		
+
+//		sync_ts();
+
+    	/* Poll if sampling frequency has changed */
+
+/*	    if (cfg->outputFreq!=tx_rate) {
+			std::cout << "Setting TX sampling rate to " << cfg->outputFreq << std::endl;
+			usrp->set_tx_rate(cfg->outputFreq);
+			tx_rate=usrp->get_tx_rate();
+			cfg->outputFreq=tx_rate;
+			
+//	    	double x=(double) cfg->NsamplesOut/tx_rate;
+//		    *tslen_ptr=(int) 1000000*x;
+//			std::cout << "Time slot becomes " << *tslen_ptr << std::endl;
+			
+		}
+
+	    sync_ts();
+
+#ifdef PRINT_INTERVAL
+	    gettimeofday(&t[2],NULL);
+	    time_interval(t);
+	    gettimeofday(&t[1],NULL);
+	    mean_interval+=(double) t[0].tv_usec/2000;
+	    ct++;
+	    if (ct==2000) {
+	    	std::cout << "Mean interval is " << mean_interval << std::endl;
+	    	mean_interval=0;
+	    	ct=0;
+	    }
+#endif
+*/
+
+	    if (cfg->NsamplesOut<buff.size()) {
+		    for (size_t n = 0; n < cfg->NsamplesOut; n++){
+				//buff[n] = 0.0+0.0i; //cfg->dacoutbuff[0][n];
+				buff[n] = cfg->dacoutbuff[0][n]*0.1;
+			}
+	    } else {
+	    	std::cout << "Error trying to send too many samples: " << cfg->NsamplesOut << ". Buffer size is " << buff.size() << std::endl;
+	    	break;
+	    }
+	    n = tx_stream->send(buffs, cfg->NsamplesOut, md);
+		num_tx_samps += n;
+        md.has_time_spec = false;
+    }
+
+    //send a mini EOB packet
+    md.end_of_burst = true;
+    tx_stream->send(buffs, 0, md);
+//	}
+}
+
+void benchmark_tx_rate_async_helper(uhd::usrp::multi_usrp::sptr usrp){
+	uhd::async_metadata_t async_md;
+
+//	std::cout << "benchmark_tx_rate_async_helper"<< std::endl;
+
+    while (not boost::this_thread::interruption_requested()){
+
+        if (not usrp->get_device()->recv_async_msg(async_md)) continue;
+
+        //handle the error codes
+        switch(async_md.event_code){
+        case uhd::async_metadata_t::EVENT_CODE_BURST_ACK:
+            return;
+
+        case uhd::async_metadata_t::EVENT_CODE_UNDERFLOW:
+        case uhd::async_metadata_t::EVENT_CODE_UNDERFLOW_IN_PACKET:
+            	num_underflows++;
+            break;
+
+        case uhd::async_metadata_t::EVENT_CODE_SEQ_ERROR:
+        case uhd::async_metadata_t::EVENT_CODE_SEQ_ERROR_IN_BURST:
+            num_seq_errors++;
+            break;
+
+        default:
+            std::cerr << "Event code: " << async_md.event_code << std::endl;
+            std::cerr << "Unexpected event on async recv, continuing..." << std::endl;
+            break;
+        }
+    }
+}
+
+//namespace po = boost::program_options;
+boost::thread_group thread_group;
+uhd::usrp::multi_usrp::sptr usrp;
+
+extern struct main_conf main_cfg;
+
+void uhd_setcfg(struct main_conf *main) {
+	
+	int i, a;
+	std::string args = "";
+	std::string args_dev = "";
+	std::string args_addr = "";
+
+	std::cout << "UHD_SETCFG___________"<< std::endl;
+
+	// Get USRP's IP Address
+////////////////////////////////////////
+	//Discover the usrps and print the results
+/*	std::cout << "Discover the usrps and print the results" << std::endl;
+	uhd::device_addrs_t device_addrs = uhd::device::find(args);
+	a = device_addrs.size();
+	std::cout << boost::format("Creating the usrp device with a=%u_____________") % a << std::endl;
+  	if(device_addrs.size() == 0){
+    	std::cerr<<"No USRP Device Found. " << std::endl;
+ 	}
+	usrp = uhd::usrp::multi_usrp::make(args);
+	for (size_t i = 0; i < device_addrs.size(); i++){
+        std::cout << "--------------------------------------------------" << std::endl;
+        std::cout << "-- UHD Device " << i << std::endl;
+        std::cout << device_addrs[i].to_pp_string(); 
+        //uhd::device::make(device_addrs[i]); //test make
+    }
+	std::cout << boost::format("Working Mode: %s") % usrp->get_pp_string(); 
+	std::cout << "--------------------------------------------------" << std::endl;
+*/
+	//Discover the usrps and print the results
+	std::cout << "Discover the usrps and print the results" << std::endl;
+	uhd::device_addrs_t available_dev = uhd::device::find(args);
+	a = available_dev.size();
+//	std::cout << boost::format("Creating the usrp device with a=%u_____________") % a << std::endl;
+  	if(available_dev.size() == 0){
+    	std::cerr<<"None USRP Device Found. " << std::endl;
+ 	}
+//	usrp = uhd::usrp::multi_usrp::make(args);
+	for (size_t i = 0; i < available_dev.size(); i++){
+        std::cout << "--------------------------------------------------" << std::endl;
+        std::cout << "-- Available UHD Devices " << i << std::endl;
+        std::cout << available_dev[i].to_pp_string(); 
+        //uhd::device::make(device_addrs[i]); //test make
+		std::cout << "--------------------------------------------------" << std::endl;
+    }
+
+	//Configure according hw_api/lnx/cfg/usrp.conf
+	std::cout << "Create and Configure USRPs according hw_api/lnx/cfg/usrp.conf" << std::endl;
+	uhd::device_addr_t wish_dev;
+	args_addr=std::string(main->address);
+	std::cout << boost::format("Creating the usrp device with args=%s") % args_addr << std::endl;
+//	wish_dev["name"] = "MY";
+	wish_dev["type"] = "usrp2";
+	wish_dev["addr"] = args_addr;
+	//create a usrp device
+	uhd::device_addrs_t device_addrs = uhd::device::find(wish_dev);
+	if(device_addrs.size() == 0){
+		std::cout << "--------------------------------------------------" << std::endl;
+    	std::cerr << boost::format(" No USRP Device with addr=%s Found.") % args_addr << std::endl;
+		std::cout << "--------------------------------------------------" << std::endl;
+ 	}
+	else {
+		usrp = uhd::usrp::multi_usrp::make(wish_dev); 
+		std::cout << "--------------------------------------------------" << std::endl;
+        std::cout << "-- UHD Device " << i << std::endl;
+        std::cout << wish_dev.to_pp_string(); 
+		std::cout << "--------------------------------------------------" << std::endl;
+	}
+	std::cout << boost::format("Working Mode: %s") % usrp->get_pp_string(); 
+	std::cout << "--------------------------------------------------" << std::endl;
+
+	// Configure Device
+//	usrp->set_tx_subdev_spec(uhd::usrp::subdev_spec_t("A:A"));
+//	usrp->set_rx_subdev_spec("A:0 A:0", 0);
+/*usrp->set_rx_subdev_spec("A:0 B:0", 0);
+usrp->set_rx_subdev_spec("A:0", 1);
+usrp->set_rx_subdev_spec("B:0 A:0", 2);
+
+The first device uses the default configuration. The second device artificially disables slot B, giving this USRP a single channel only. The third device uses both devices, but flips their order
+*/
+	/* TODO: configure clock */
+
+
+	/* and save configuration */
+	memcpy(&main_cfg,main,sizeof(struct main_conf));
+	std::cout << "UHD_SETCFG OUT"<< std::endl;
+}
+
+
+/***********************************************************************
+ * Main code + dispatcher
+ **********************************************************************/
+int uhd_init(struct dac_cfg *cfg, int *timeSlotLength, void (*sync)(void)){
+
+	int numchannels=0;
+    std::string rx_otw, tx_otw;
+    std::string rx_cpu, tx_cpu;
+    rx_otw="sc16";
+	tx_otw="sc16";
+	rx_cpu="fc32";
+	tx_cpu="fc32";
+	int Tx=0, Rx=0;
+	char mode[64]; //std::string mode = "";
+	
+	_Complex float *pp = &cfg->dacoutbuff[0][0];
+	_Complex float *qq = &cfg->dacinbuff[0][0];
+
+//	uhd::set_thread_priority_safe(); //A
+
+
+	std::cout << "UHD_INIT"<< std::endl;
+	//mode=std::string(main_cfg.RxTxmode);
+//	mode=main_cfg.RxTxmode;
+//	std::cout << boost::format("mode: %s MHz...") % mode << std::endl;
+//	if(strcmp(main_cfg.RxTxmode, "TX") == 0)Tx=1;
+//	std::cout << boost::format("Tx = %u ") % Tx << std::endl;
+/*	if(mode=="RX")Rx=1;
+	if(mode=="TXRX"){*/
+//		Rx=1;
+//		Tx=1;
+//	}
+	
+	//if((main_cfg.RxTxmode &  0x01) == 1)TX=1;
+	//if(main_cfg.RxTxmode == 2)RX=1;
+	std::cout << boost::format("clock = %s ") % main_cfg.clock << std::endl;
+	std::cout << boost::format("address = %s ") % main_cfg.address << std::endl;
+	std::cout << boost::format("RxTxmode = %u ") % main_cfg.RxTxmode << std::endl;
+
+	std::cout << boost::format("cfg->dacoutbuff[0][0] = %u ") % &cfg->dacoutbuff[0][0] << std::endl;
+	std::cout << boost::format("cfg->dacinbuff[0][0] = %u ") % &cfg->dacinbuff[0][0] << std::endl;
+
+	std::cout << "addr pp: " << pp << std::endl;
+	std::cout << "addr qq: " << qq << std::endl;
+
+	Rx=main_cfg.RxTxmode >> 1;
+	Tx=main_cfg.RxTxmode & 0x01;
+	std::cout << boost::format("Tx = %u ") % Tx << std::endl;
+	std::cout << boost::format("Rx = %u ") % Rx << std::endl;
+
+	
+
+
+    //spawn the receive test thread
+    //if (main_cfg.chain_is_tx==0) {
+	if (Rx==1) {
+		std::cout << "USRP Receiver Active"<< std::endl;
+//#ifdef kk
+    	/** Set receive chain */
+		for(size_t chan = 0; chan < usrp->get_rx_num_channels(); chan++) {
+			double freq = cfg->inputRFFreq;
+			if (freq>0) {
+				std::cout << boost::format("Setting RX Freq: %f MHz...") % (freq/1e6) << std::endl;
+				usrp->set_rx_freq(freq, chan);
+				std::cout << boost::format("Actual RX Freq: %f MHz...") % (usrp->get_rx_freq(chan)/1e6) << std::endl << std::endl;
+			}
+
+			//set the rf gain
+			double gain = cfg->rx_gain;
+			if (gain>0) {
+				std::cout << boost::format("Setting RX Gain: %f dB...") % gain << std::endl;
+				usrp->set_rx_gain(gain, chan);
+				std::cout << boost::format("Actual RX Gain: %f dB...") % usrp->get_rx_gain(chan) << std::endl << std::endl;
+			}
+
+			//set the IF filter bandwidth
+			double bw = cfg->rx_bw;
+			if (bw>0) {
+				std::cout << boost::format("Setting RX Bandwidth: %f MHz...") % bw << std::endl;
+				usrp->set_rx_bandwidth(bw, chan);
+				std::cout << boost::format("Actual RX Bandwidth: %f MHz...") % usrp->get_rx_bandwidth(chan) << std::endl << std::endl;
+			}
+		}
+//#endif
+    	double x=(double) cfg->NsamplesOut/cfg->inputFreq;
+    	*timeSlotLength=(int) 1000000*x;
+		thread_group.create_thread(boost::bind(&benchmark_rx_rate, usrp, rx_cpu, rx_otw,cfg,sync,timeSlotLength));
+    }
+
+    //spawn the transmit test thread
+	//if (main_cfg.chain_is_tx==1) {
+	if (Tx==1) {
+
+
+		std::cout << "USRP Transmitter Active"<< std::endl;
+
+		/** Set transmit chain */
+		for(size_t chan = 0; chan < usrp->get_tx_num_channels(); chan++) {
+			std::cout << "Set transmit chain "<< std::endl;
+			double freq = cfg->outputRFFreq;
+			if (freq>0) {
+				std::cout << boost::format("Setting TX Freq: %f MHz...") % (freq/1e6) << std::endl;
+				usrp->set_tx_freq(freq, chan);
+				std::cout << boost::format("Actual TX Freq: %f MHz...") % (usrp->get_tx_freq(chan)/1e6) << std::endl << std::endl;
+			}
+
+			//set the rf gain
+			double gain = cfg->tx_gain;
+			if (gain>0.0) {
+				std::cout << boost::format("Setting TX Gain(chan=%u): %f dB...") % chan % gain << std::endl;
+				usrp->set_tx_gain((double)gain, chan);
+				std::cout << boost::format("Actual TX Gain: %f dB...") % (float)usrp->get_tx_gain(chan) << std::endl << std::endl;
+			}
+
+			//set the IF filter bandwidth
+			double bw = cfg->tx_bw;
+			if (bw>0.0) {
+				std::cout << boost::format("Setting TX Bandwidth: %f MHz...") % bw << std::endl;
+				usrp->set_tx_bandwidth(bw, chan);
+				std::cout << boost::format("Actual TX Bandwidth: %f MHz...") % usrp->get_tx_bandwidth(chan) << std::endl << std::endl;
+			}
+		}
+
+		std::cout << "benchmark_tx_rate "<< std::endl;
+		double x=(double) cfg->NsamplesOut/cfg->outputFreq;
+		std::cout << boost::format("cfg->outputFreq: %3.2f sec") % cfg->outputFreq << std::endl;
+		std::cout << boost::format("timeSlotLength: %u usec") % (int)(x*1000000) << std::endl << std::endl;
+		*timeSlotLength=(int) 1000000*x;
+		thread_group.create_thread(boost::bind(&benchmark_tx_rate, usrp, tx_cpu, tx_otw,cfg,sync,timeSlotLength));
+		thread_group.create_thread(boost::bind(&benchmark_tx_rate_async_helper, usrp));
+		
+	}
+	return 1;
+}
+
+void uhd_close() {
+
+    //	interrupt and join the threads
+    thread_group.interrupt_all();
+    thread_group.join_all();
+
+    //print summary
+    std::cout << std::endl << boost::format(
+        "Benchmark rate summary:\n"
+        "  Num received samples:    %u\n"
+        "  Num dropped samples:     %u\n"
+        "  Num overflows detected:  %u\n"
+        "  Num transmitted samples: %u\n"
+        "  Num sequence errors:     %u\n"
+        "  Num underflows detected: %u\n"
+    ) % num_rx_samps % num_dropped_samps % num_overflows % num_tx_samps % num_seq_errors % num_underflows << std::endl;
+
+}

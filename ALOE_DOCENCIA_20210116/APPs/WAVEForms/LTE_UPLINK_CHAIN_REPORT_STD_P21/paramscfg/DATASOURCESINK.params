@@ -1,0 +1,33 @@
+#debug 0: SEND DATA FROM A FILE, 1: SEND A DATA PATTERN
+parameter {
+	name = mode
+	value = 0
+}
+
+parameter {
+	name = block_length
+	value = 360
+}
+#  0: No control data flow, 1: With control of data flow
+parameter {
+	name = ctrl_flow
+	value = 1
+}
+
+parameter {
+	name = snd_flag
+	value = 36
+}
+
+#debug 0: NO DEBUGG, 1: DEBUGG
+parameter {
+	name = debug
+	value = 0
+}
+
+#input_FILE
+parameter {
+	name = input_FILE
+	value = data/MARBLES.BMP
+}
+

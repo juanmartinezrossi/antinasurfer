@@ -1,0 +1,23 @@
+parameter {
+	name = block_length
+	value = 55
+}
+#  0: No control data flow, 1: With control of data flow
+parameter {
+	name = ctrl_flow
+	value = 1
+}
+
+# 0: NO DEBUG, 1: DEBUG
+parameter {
+	name = debug
+	value = 0
+}
+
+#0: SEND FILE, 1: SEND DATA BLOCS
+parameter {
+	name = mode
+	value = 1
+}
+
+

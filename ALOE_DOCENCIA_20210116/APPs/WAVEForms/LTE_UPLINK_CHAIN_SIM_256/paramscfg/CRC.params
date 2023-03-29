@@ -1,0 +1,25 @@
+
+# Simple CRC modes: Add CRC or check CRC.
+# 	ADD 0
+# 	CHECK 1
+#
+parameter {
+	name = mode
+	value = 0
+}
+
+#CRC LTE: Name 24A;	crc_poly(HEX)=0x1864CFB; 	crc_poly(DEC)=25578747; crc_length=24
+#CRC LTE: Name 24B	crc_poly(HEX)=0X1800063;	crc_poly(DEC)=25165923; crc_length=24
+#CRC LTE: Name 16	crc_poly(HEX)=0x11021; 		crc_poly(DEC)=69665; 	crc_length=16
+#CRC LTE: Name 8	crc_poly(HEX)=0x19B;		crc_poly(DEC)=411; 		crc_length=8
+
+parameter {
+	name = crc_length
+	value = 24
+}
+
+parameter {
+	name = crc_poly
+	value = 25578747
+}
+

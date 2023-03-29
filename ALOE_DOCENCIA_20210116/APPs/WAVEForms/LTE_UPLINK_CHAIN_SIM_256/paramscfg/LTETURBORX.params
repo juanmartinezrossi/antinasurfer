@@ -1,0 +1,23 @@
+#mode [0: CODER, 1: DECODER]
+#define ENCODER_ONLY			1
+#define DECODER_ONLY			2
+#define ENCODER_RATE_MATCHING	3
+#define DECODER_RATE_MATCHING	4
+#define TEST_TURBO_ENC_DEC		5
+#define TEST_ALL								6
+#define TEST_ENCOD_DECOD				7		
+	
+parameter {
+	name = opmode
+	value = 2
+}
+parameter {
+	name = CodeRate
+	value = 0.7
+}
+# CHAR or FLOAT
+parameter {
+	name = datatypeIN
+	value = FLOAT
+}
+

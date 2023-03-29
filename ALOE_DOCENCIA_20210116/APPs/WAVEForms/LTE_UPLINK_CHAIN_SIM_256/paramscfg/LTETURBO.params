@@ -1,0 +1,63 @@
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# opmode: 	1=ENCODER_ONLY; 2=DECODER_ONLY, 3=TEST_ALL
+
+# ENCODER_ONLY: Performs all operations related to encoding and rate matching.
+# DECODER_ONLY: Operations related with decoding and unratematching.
+# TEST_ALL: Performs all operations of ENCODER and DECODER but is only for testing the algorithm. Module do not received data. 
+# Data is internally generated and delivered to the turbocoder+ratematching and its output introduced into the decoder-unratematching.
+# Turboencoder follows LTE specs. Such turboencoder delivers 3 bits for each one at the input. It provides a CodeRate = 1/3.
+# Rate_maching algorithm eliminates some of the redundancy bits, following an specified pattern, in order to increase the CodeRate up to 1.0
+# This increases the spectral efficiency.
+ 
+parameter {
+	name = opmode
+	value = 3
+}
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# CodeRate: (User bits) / (Maximum allowed bits according RBs used). 
+# Defines the ratio between the number of user bits sent and the maximum number of bits to be transmitted (depends of the number of Resource Blocks used).
+
+# LTE specs define a table with the valid datalength values at the input of the turboencoder. That implementation requires to input a valid datalength. 
+# Otherwise execution is stopped.
+# The procedure to follow in order to setup proper working parameters is:
+# 	1) Use an TEST.app with only LTETURBO module with no active interfaces.
+#		2) Use opmode=TEST_ALL, CodeRate = "desired code rate" and setup the datalength parameter to any value.
+# 	3) Execute Test.app up to init phase and check the valid datalength values. 
+#			 According the selected CodeRate value there is a valid datalength for each subframe case: 14 FFTs, 13 FFTs or 7 FFTs.
+#		4) Set datalength to one of such values.
+#   From that procedure we get the valid datalength values for different subframes according a specific CodeRate.
+#
+#		Now we can move to the complete LTE chain, using the encoder for the transmitter and the decoder for the receiver, and assure that both use the same CodeRate.
+#   
+
+# Higher number of errors as higher CodeRate value
+parameter {
+	name = CodeRate
+	value = 0.95
+}
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# datatypeIN: CHAR or FLOAT
+# Defines the data type input at decoder. Turbodecoder requires FLOATS. Traslation is done when CHARS.
+
+# Although input data is defined as chars at LTEturboCOD_interfaces.h we can select by datatypeIN parameters between CHARs or FLOATs.
+# Turbodecoder uses by default float at its inputs, but for testing purposes sometimes (direct connection between ENCODER and DECODER) we need to accept chars that 
+# represents bits (char with only one bit valid). Please, take care of properly select the datatypeIN according the app interfaces.
+
+parameter {
+	name = datatypeIN
+	value = CHAR
+}
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# DECODIterations: Maximum number of iterations allowed to turbodecoder.
+# Lower BER as higher the number of iterations.
+parameter {
+	name = DECODIterations
+	value = 1
+}
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# datalength: Indicates the datalength, in chars (8 bits). Only valid during TEST_ALL mode. 
+parameter {
+	name = datalength
+	value = 480
+}
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------------

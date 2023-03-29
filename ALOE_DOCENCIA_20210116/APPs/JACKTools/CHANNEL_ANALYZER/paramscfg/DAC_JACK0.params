@@ -1,0 +1,39 @@
+#####################################################################################################################
+##  GLOBAL PARAMETERS  ##############################################################################################
+#-------------------------------------------------------------------------------------------------------------------#
+#### CAUTION. Use dac_cfg.h datatypes here.
+ 
+#Operation Mode: 0=TX, 1=RX, 2=RX&TX, 3=TEST0 (TX generated signal), 4=TEST1 (Quality Tone), 5=BYPASS (ECHO effect)
+parameter {
+	name = op_mode	
+	value = 2
+}
+
+#FIXED TO COMPLEX DATA: DO NOT CHANGE
+#DAC_SAMPLE_COMPLEXFLOAT		6
+#parameter {
+#	name = sampleType	
+#	value = 6
+#}
+
+parameter {
+	name = NsamplesIn
+	value = 1024
+}
+
+parameter {
+	name = NsamplesOut
+	value = 1024
+}
+
+parameter {
+	name = tx_gain
+	value = 1.0
+}
+
+parameter {
+	name = rx_gain
+	value = 1.0
+}
+
+

@@ -1,0 +1,3 @@
+cd ../../../
+sudo make install
+

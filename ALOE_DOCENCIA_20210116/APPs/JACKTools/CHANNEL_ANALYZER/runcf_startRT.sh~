@@ -1,0 +1,5 @@
+sudo ./stop_runcf.sh
+
+sudo ./start_jack_server.sh
+
+sudo runcf -c hwplatform/platformJACK.conf

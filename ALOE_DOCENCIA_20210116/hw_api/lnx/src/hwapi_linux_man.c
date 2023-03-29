@@ -1,0 +1,368 @@
+/*
+ * hwapi_linux_man.c
+ *
+ * Copyright (c) 2009 Ismael Gomez-Miguelez, UPC <ismael.gomez at tsc.upc.edu>,
+ *                    Xavier Reves, UPC <xavier.reves at tsc.upc.edu>
+ * All rights reserved.
+ *
+ *
+ * This file is part of ALOE.
+ *
+ * ALOE is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * ALOE is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with ALOE.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/msg.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/wait.h>
+#include <sys/time.h>
+#include <time.h>
+#include <errno.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <semaphore.h>
+#include "mem.h"
+#include "phal_hw_api.h"  
+#include "phal_hw_api_man.h"
+#include "hwapi_backd.h"
+
+#include "parser.h"
+
+#define MAX_PATH_LEN 512
+char path[MAX_PATH_LEN];
+
+
+/** hw_api general database */
+extern struct hw_api_db *hw_api_db;
+
+/** @defgroup res File Resource Management Functions
+ * 
+ * Accessing on-disk files for reading application, statistics or parameter
+ * configurations may be realized through this group of functions.
+ *  
+ * @{
+ */
+
+/** Open a file, parse it to a buffer and close.
+ *
+ * Useful for reading configuration files. Reads a text
+ * file, parses it (erase spaces, remove comments, etc.)
+ * and saves it into an allocated buffer of memory. The
+ * allocation is done inside this function.
+ * The file is also closed by this function when job is 
+ * finished and data is saved into memory. 
+ *
+ * @warnign This function requires the utils library to be 
+ * linked to the program.
+ *
+ * @param res_name Name of the resource (file)
+ * @param buffer Address of the pointer where allocated data
+ * will be saved. 
+ * @return Amount of bytes saved into memory, -1 if error
+ */
+int hwapi_res_parseall(char *res_name, char **buffer) 
+{
+    hwapi_res_parseall_(res_name,buffer,0);
+}
+int hwapi_res_parseall_(char *res_name, char **buffer,int absolute)
+{
+    FILE *f;
+    int offset;
+
+//		printf("hwapi_res_parseall_\n");
+
+    if (absolute) {
+		if (strlen(res_name) + 2 > MAX_PATH_LEN) {
+			printf("/////);\n");
+			return -1;
+		}
+    } else {
+		if (strlen(res_name) + strlen(hw_api_db->res_path) + 2 > MAX_PATH_LEN) {
+			printf("/////+);\n");
+			return -1;
+		}
+    }
+
+    /* get file path */
+    if (absolute) {
+        strcpy(path,res_name);
+//				printf("hwapi_res_parseall_():absolute=%d: %s\n", absolute, path);
+    } else {
+//				printf("hwapi_res_parseall_(): hw_api_db->res_path= %s\n", hw_api_db->res_path);
+//				printf("hwapi_res_parseall_(): res_name=%s\n", res_name);
+        sprintf(path, "%s/%s", hw_api_db->res_path, res_name);
+//				printf("hwapi_res_parseall_():absolute=%d: %s\n", absolute, path);
+    }
+
+    f = fopen(path, "r");
+
+    if (!f) {
+//    	printf("WARNING!!!: hwapi_res_parseall_():FILE %s NOT READ\n", path);
+    	printf("\033[1m\033[31mWARNING!!!: hwapi_res_parseall_():FILE %s ......NOT READ!!!\033[0m\n", path);
+//		printf("f = fopen(path);\n");
+        return -1;
+    }
+
+    offset = read_file(f, buffer, OPT_SILENT);
+
+    fclose(f);
+
+    if (offset < 0) {
+        printf("HWAPI: Error reading file.\n");
+        return -1;
+    } else {
+        return offset;
+    }
+}
+
+/** Open Resource (File).
+ *
+ * @todo path of resource files
+ *
+ * This function opens a resource so it can be read/written 
+ * 
+ * The function returns a file descriptor which will be later used
+ * by read/write functions.
+ *  
+ * @param res_name String indicating the name of the resource
+ * @param mode FLOW_READ_ONLY, FLOW_READ_WRITE, FLOW_WRITE_ONLY global constants
+ * @param file_len fills with length of the file 
+ *
+ * @return >0 file descriptor
+ * @return <0 error
+ */
+int hwapi_res_open(char *res_name, int mode, int *file_len)
+{
+    int n;
+    int args;
+    int filelen;
+	static int flag=0;
+
+    assert(res_name);
+
+    int i;
+
+    if (strlen(res_name) + strlen(hw_api_db->res_path) + 2 > MAX_PATH_LEN) {
+        return -1;
+    }
+
+    /* get args param */
+    switch (mode) {
+    case FLOW_WRITE_ONLY:
+        args = O_WRONLY | O_CREAT | O_TRUNC;
+        break;
+    case FLOW_READ_ONLY:
+        args = O_RDONLY;
+        break;
+    case FLOW_READ_WRITE:
+        args = O_RDWR | O_CREAT | O_TRUNC;
+        break;
+    }
+//	printf("hwapi_res_open()0: APP='%s', hw_api_db->resource_path=%s, resource_name=%s\n", path, hw_api_db->res_path, res_name);
+	if(flag==0){
+		//printf("hwapi_res_open()0: APP_NAME='.%s%s', MODULE_NAME=%s\n", hw_api_db->res_path, path, res_name);
+//		printf("hwapi_res_open()0: APP_NAME='.%s%s'\n", hw_api_db->res_path, path);
+		flag=1;
+	}
+
+    /*AGBJuly15	sprintf(path, "%s/%s", hw_api_db->res_path, res_name);*/
+	sprintf(path, "%s", res_name);
+
+//	printf("hwapi_res_open()1:%s\n", path);
+
+    n = open(path, args, S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH);
+    if (n < 0) {
+        //printf("Error hwapi opening %s\n", path);
+		printf("\033[1;31m HWAPI ERROR: Please Compile!!! Executable file %s can not be found!!!!\033[0m\n", path);
+		printf("\033[1;32m HWAPI ERROR: Please Compile!!! Executable file %s can not be found!!!!\033[0m\n", path);
+		printf("\033[1;33m HWAPI ERROR: Please Compile!!! Executable file %s can not be found!!!!\033[0m\n", path);
+		printf("\033[1;31m Or,...Please, CHECK DE NAME OF THE MODULE IN APP file\033[0m\n", path);
+
+        perror("open");
+        if (mode == FLOW_WRITE_ONLY) {
+            i = strlen(path);
+            while (path[i] != FILE_SEPARATOR_CH && i >= 0) {
+                i--;
+            }
+            path[i] = '\0';
+            if (open(path, O_RDONLY, S_IRUSR)) {
+                printf("Creating directory %s\n", path);
+                if (mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR | S_IROTH | S_IWOTH | S_IXOTH)) {
+                    printf("Error creating %s\n", path);
+                    perror("mkdir");
+                } else {
+                    path[strlen(path)] = FILE_SEPARATOR_CH;
+                    n = open(path, args, S_IRUSR | S_IWUSR | S_IXUSR | S_IROTH | S_IWOTH | S_IXOTH);
+                    if (n == -1) {
+                        perror("open");
+                    }
+                }
+            } else {
+                return -1;
+            }
+        }
+    }
+
+ 
+    if (file_len) {
+        filelen = lseek(n, 0, SEEK_END);
+        lseek(n, 0, SEEK_SET);
+        *file_len = filelen;
+    }
+    return n;
+}
+
+/** Close Resource.
+ *	
+ * Closes and deallocates resources associated with file descriptor fd.
+ * 
+ * No further read/write is possible after this call.
+ * 
+ * @param fd File descriptor
+ *
+ * @return >0 success
+ * @return <0 error
+ */
+int hwapi_res_close(int fd)
+{
+    int n;
+    n = close(fd);
+    if (n < 0) {
+        printf("HWAPI: Error while closing fd=%d\n", fd);
+        perror("close");
+        return -1;
+    }
+    return 1;
+}
+
+/** Read Resource.
+ *
+ * Reads blen bytes from the resource fd and saves to user buffer
+ * 
+ * If buffer is NULL pointer, it is equivalent to POSIX's lseek 
+ * 
+ * @param fd file descriptor 
+ * @param buffer pointer where data must be saved
+ * @param blen number of bytes to read
+ *
+ * @return >0 number of bytes successfully read
+ * @return <0 error
+ */
+int hwapi_res_read(int fd, char *buffer, int blen)
+{
+    int n;
+    assert(blen >= 0);
+
+    if (buffer) {
+        n = read(fd, buffer, blen);
+    } else {
+        n = lseek(fd, blen, SEEK_CUR);
+    }
+    if (n < 0) {
+        perror("read");
+        return n;
+    }
+    return n;
+}
+
+
+/** Write Resource.
+ *	
+ * Writes blen bytes from the user buffer to the resource 
+ * associated with file descpriptor
+ * 
+ * @param fd file descriptor 
+ * @param buffer pointer where data must be read
+ * @param blen number of bytes to write
+ *
+ * @return >0 number of bytes successfully read
+ * @return <0 error
+ */
+int hwapi_res_write(int fd, char *buffer, int blen)
+{
+    int n;
+    assert(buffer && blen >= 0);
+
+    n = write(fd, buffer, blen);
+    if (n < 0) {
+        perror("write");
+    }
+    return n;
+}
+
+/** @} */
+
+char buff[1024];
+
+
+/** @defgroup compiler Compiler and Linker Tools
+ *
+ * Provide functions to access system and platform specific tools
+ * to perform compilation, linking or relocation of programs for
+ * the target platform.
+ *
+ * @{
+ */
+
+char lnk[128];
+
+/** Call TI c6000 linker for relocation.
+ * WINE must be installed in the system. Also the lnk6x.exe windows executable.
+ * The path to the executable and the emulator must be set at phal_hw_api_man.h
+ */
+int hwapi_comp_relocate(char *res_name, char *output_res_name,
+        unsigned int new_address, unsigned int new_len)
+{
+    int fd,n;
+
+    sprintf(lnk,"%s/%s",hw_api_db->res_path,"lnk.cmd");
+    fd = open(lnk,O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (fd<0) {
+        perror("open");
+        return 0;
+    }
+    sprintf(buff,"-m\"./%s/%s.map\"\n-o\"./%s/%s\"\nMEMORY { SDRAM: org = 0x%x, len = 0x%x }\n",
+            hw_api_db->res_path,res_name,hw_api_db->res_path,output_res_name,new_address,new_len);
+    if (write(fd,buff,strlen(buff)+1)<0) {
+        perror("write");
+        close(fd);
+        return 0;
+    }
+    close(fd);
+    n=fork();
+    if (n<0) {
+        perror("fork");
+        return 0;
+    }
+    sprintf(buff,"%s/%s",hw_api_db->res_path,res_name);
+    if (!n) {
+        execl(WINE_PATH,WINE_PATH,TI_LINKER_PATH,lnk,"-ar",buff,NULL);
+        printf("Did not launch wine\n");
+        perror("execl");
+    }
+    while (!waitpid(n,NULL,WNOHANG)) {
+        hwapi_relinquish_daemon();
+    }
+    return 1;
+}
+
+/**@} */

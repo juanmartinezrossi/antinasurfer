@@ -1,0 +1,668 @@
+/** @file simple_client.c
+ *
+ * @brief This simple client demonstrates the most basic features of JACK
+ * as they would be used by many applications.
+ */
+
+#include <stdio.h>
+#include <errno.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <complex.h>
+#include <signal.h>
+
+#include <jack/jack.h>
+
+#include "set.h"
+#include "str.h"
+#include "cfg_parser.h"
+#include "dac_cfg.h"
+
+
+#define DEBUGTX			1
+#define DEBUGRXTX		2
+#define NORMAL			3
+int exec_mode=NORMAL; //DEBUGRXTX;
+
+jack_port_t *input_port1, *input_port2;
+jack_port_t *output_port1, *output_port2;
+jack_client_t *client;
+
+//const double PI = 3.14;
+#ifndef M_PI
+#define M_PI  (3.14159265)
+#endif
+
+#define TABLE_SIZE   (200)
+typedef struct{
+    float sine[TABLE_SIZE];
+    int left_phase;
+    int right_phase;
+}paTestData;
+paTestData data;
+typedef jack_default_audio_sample_t sample_t;
+
+int semid, semidx;
+
+
+/* Pointer to input/output buffers*/
+_Complex float *output, *input;
+/*samples in cycle*/
+//jack_nframes_t samincy;
+/*the current offset*/
+//long offset = 0;
+
+
+void gensintable(){
+	int i;
+	for( i=0; i<TABLE_SIZE; i++ )
+    {
+        data.sine[i] = 0.2 * (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );
+    }
+}
+
+static void signal_handler(int sig)
+{
+	jack_client_close(client);
+	fprintf(stderr, "signal received, exiting ...sig=%d\n", sig);
+	exit(0);
+}
+
+
+void (*syncFunction)(void);
+
+#define MAXJ	100
+
+/**
+ * The process callback for this JACK application is called in a
+ * special realtime thread once for each audio cycle.
+ *
+ * This client does nothing more than copy data from its input
+ * port to its output port. It will exit when stopped by
+ * the user (e.g. using Ctrl-C on a unix-ish operating system)
+ */
+int process(jack_nframes_t nframes, void *arg) {
+
+	jack_default_audio_sample_t *out1, *out2;
+	jack_default_audio_sample_t *in1, *in2;
+	
+	int i;
+	static int j=0, k=0;
+
+	out1 = (jack_default_audio_sample_t*)jack_port_get_buffer (output_port1, nframes);
+	out2 = (jack_default_audio_sample_t*)jack_port_get_buffer (output_port2, nframes);
+	in1 = (jack_default_audio_sample_t*)jack_port_get_buffer (input_port1, nframes);
+	in2 = (jack_default_audio_sample_t*)jack_port_get_buffer (input_port2, nframes);
+	//MODE DEBUGTX
+	if(exec_mode==DEBUGTX){
+		for( i=0; i<nframes; i++ ){
+        	if(j>MAXJ/2){
+				out1[i] = data.sine[data.left_phase];  /* left */
+				out2[i] = 0;
+			}
+			else {
+				out1[i] = 0;
+        			out2[i] = data.sine[data.right_phase];  /* right */
+			}
+			data.left_phase += (k+3);
+			if( data.left_phase >= TABLE_SIZE ) data.left_phase -= TABLE_SIZE;
+			data.right_phase += (k+5); /* higher pitch so we can distinguish left and right. */
+			if( data.right_phase >= TABLE_SIZE ) data.right_phase -= TABLE_SIZE;
+   		}
+		j++;
+		if(j>=MAXJ){
+			j=0;
+			k = (k+1);
+			if(k>=10)k=0;
+		}
+	}
+	//MODE DEBUGRXTX
+	if(exec_mode==DEBUGRXTX){
+		memcpy(out1, in2, sizeof(jack_default_audio_sample_t) * nframes);
+		memcpy(out2, in1, sizeof(jack_default_audio_sample_t) * nframes);
+	}
+	//MODE NORMAL
+	if(exec_mode==NORMAL){
+		for(i=0; i<nframes; i++){
+			__real__ input[i]=in1[i];
+			__imag__ input[i]=in2[i];
+			out1[i]=__real__ output[i];
+			out2[i]=__imag__ output[i];
+		}
+	}
+	syncFunction();
+	return 0;
+}
+
+int bufferchg(jack_nframes_t nframes, void *arg) {
+	printf("Buffer size is now %lu\n", nframes);
+	return 0;
+}
+
+int srate(jack_nframes_t nframes, void *arg) {
+	printf("the sample rate is now %lu/sec\n", nframes);
+	return 0;
+}
+
+void error(const char *desc) {
+	fprintf(stderr, "JACK error: %s\n", desc);
+}
+
+/**
+ * JACK calls this shutdown_callback if the server ever shuts down or
+ * decides to disconnect the client.
+ */
+void jack_shutdown(void *arg) {
+	printf("CAUTION: Jack server shut down!!!\n");
+}
+
+//struct main_conf main_cfg;
+char filepath[200];
+
+int SamplingFrequency;
+int NofSamples;
+
+//int sndcard_readcfg(char *name, int *NsamplesIn, int *NsamplesOut) {
+int sndcard_readcfg(struct dac_cfg *dac_cfg) {
+	int i=0, j, offset;
+	char *buffer;
+	cfg_o cfg;
+	sect_o sect;
+	key_o key;
+	char *name;
+	float tmp;
+
+	hwapi_mem_silent(1);
+	name=dac_cfg->filename;
+	sprintf(filepath, "/usr/local/etc/%s", name);
+
+//	printf("sndcard_imp.c==>sndcard_readcfg()___________________________________________________CFG\n");
+//	printf("sndcard_imp.c==>sndcard_readcfg(): Read File:/usr/local/etc/%s\n", name);
+	
+	offset = hwapi_res_parseall_(filepath, &buffer,1);
+//	printf("sndcard_imp.c==>sndcard_readcfg(): offset=%d     CFG\n", offset);
+	if (offset < 0) {
+		printf ("Error reading file %s\n", filepath);
+		return 0;
+	}
+
+	cfg = cfg_new(buffer, offset);
+	if (!cfg) {
+		printf ("Error parsing file %s\n", filepath);
+		free(buffer);
+		return 0;
+	}
+	hwapi_mem_silent(0);
+	//READ SECTION "tx"
+	sect=Set_find(cfg_sections(cfg),"tx",sect_findtitle);
+	if (!sect) {
+		printf("TX is disabled\n");
+	} else {
+		if (!(key = Set_find(sect_keys(sect),"samp_freq",key_findname))) {
+			printf("Warning unspecified tx sample frequency. Setting to 1 MHz\n");
+			dac_cfg->outputFreq = 48000;
+		} else {
+			key_value(key,1,PARAM_FLOAT,&tmp);
+			dac_cfg->outputFreq=(double) tmp;
+			printf("SOUND_CARD_TX: outputFreq=%3.1f\n", (float)dac_cfg->outputFreq);
+		}
+		if (!(key = Set_find(sect_keys(sect),"freq",key_findname))) {
+			printf("Warning unspecified tx frequency. Setting to default\n");
+			dac_cfg->outputRFFreq = 0;
+		} else {
+			key_value(key,1,PARAM_FLOAT,&tmp);
+			dac_cfg->outputRFFreq=(double) tmp;
+			printf("SOUND_CARD_TX: outputRFFreq=%3.1f\n", (float)dac_cfg->outputRFFreq);
+		}
+		if (!(key = Set_find(sect_keys(sect),"blocksize",key_findname))) {
+			printf("Warning unspecified tx blocksize. Setting to 10 K\n");
+			dac_cfg->NsamplesOut = 1024;
+		} else {
+			key_value(key,1,PARAM_INT,&dac_cfg->NsamplesOut);
+			printf("SOUND_CARD_TX: NsamplesOut=%d\n", (int)dac_cfg->NsamplesOut);
+			if((int)dac_cfg->NsamplesOut > DAC_BUFFER_SZ){
+				printf("sndcard_imp.c==>sndcard_readcfg(): ERROR:  NsamplesOut=%d > DAC_BUFFER_SZ=%d\n",
+							(int)dac_cfg->NsamplesOut, DAC_BUFFER_SZ);
+				printf("Please, decrease the 'blocksize' parameter in hw_api/lnx/cfg/dacsound.conf");
+				return(0);					
+			}
+		}
+		if (!(key = Set_find(sect_keys(sect),"gain",key_findname))) {
+			printf("Warning unspecified tx gain. Setting to default\n");
+			dac_cfg->tx_gain = 1.0;
+		} else {
+			key_value(key,1,PARAM_FLOAT,&dac_cfg->tx_gain);
+			printf("SOUND_CARD_TX: tx_gain=%3.1f\n", (float)dac_cfg->tx_gain);
+		}
+		if (!(key = Set_find(sect_keys(sect),"bw",key_findname))) {
+			printf("Warning unspecified bw. Setting to default\n");
+			dac_cfg->tx_bw = 24000.0;
+		} else {
+			key_value(key,1,PARAM_FLOAT,&dac_cfg->tx_bw);
+			printf("SOUND_CARD_TX: tx_bw=%3.1f\n", (float)dac_cfg->tx_bw);
+		}
+
+	}
+	//READ SECTION "rx"
+	sect=Set_find(cfg_sections(cfg),"rx",sect_findtitle);
+	if (!sect) {
+		printf("RX is disabled\n");
+	} else {
+		if (!(key = Set_find(sect_keys(sect),"samp_freq",key_findname))) {
+			printf("Warning unspecified rx sample frequency. Setting to 1 MHz\n");
+			dac_cfg->inputFreq = 48000;
+		} else {
+			key_value(key,1,PARAM_FLOAT,&tmp);
+			dac_cfg->inputFreq = (double) tmp;
+			printf("SOUND_CARD_RX: inputFreq=%3.1f\n", (float)dac_cfg->inputFreq);
+		}
+		if (!(key = Set_find(sect_keys(sect),"freq",key_findname))) {
+			printf("Warning unspecified rx frequency. Setting to default\n");
+			dac_cfg->inputRFFreq = 0;
+		} else {
+			key_value(key,1,PARAM_FLOAT,&tmp);
+			dac_cfg->inputRFFreq = (double) tmp;
+			printf("SOUND_CARD_RX: inputRFFreq=%3.1f\n", (float)dac_cfg->inputRFFreq);
+		}
+		if (!(key = Set_find(sect_keys(sect),"blocksize",key_findname))) {
+			printf("Warning unspecified rx blocksize. Setting to 10 K\n");
+			dac_cfg->NsamplesIn = 1024;
+		} else {
+			key_value(key,1,PARAM_INT,&dac_cfg->NsamplesIn);
+			printf("SOUND_CARD_RX: NsamplesIn=%d\n", (int)dac_cfg->NsamplesIn);
+			if((int)dac_cfg->NsamplesIn > DAC_BUFFER_SZ){
+				printf("sndcard_imp.c==>sndcard_readcfg(): ERROR:  NsamplesIn=%d > DAC_BUFFER_SZ=%d\n",
+							(int)dac_cfg->NsamplesIn, DAC_BUFFER_SZ);
+				printf("Please, decrease the 'blocksize' parameter in hw_api/lnx/cfg/dacsound.conf");
+				return(0);					
+			}
+		}
+		if (!(key = Set_find(sect_keys(sect),"gain",key_findname))) {
+			printf("Warning unspecified rx gain. Setting to default\n");
+			dac_cfg->rx_gain = 1.0;
+		} else {
+			key_value(key,1,PARAM_FLOAT,&dac_cfg->rx_gain);
+			printf("SOUND_CARD_RX: rx_gain=%3.1f\n", (float)dac_cfg->rx_gain);
+		}
+		if (!(key = Set_find(sect_keys(sect),"bw",key_findname))) {
+			printf("Warning unspecified rx bw. Setting to default\n");
+			dac_cfg->rx_bw = 24000;
+		} else {
+			key_value(key,1,PARAM_FLOAT,&dac_cfg->rx_bw);
+			printf("SOUND_CARD_RX: rx_bw=%3.1f\n", (float)dac_cfg->rx_bw);
+		}
+	}
+
+	dac_cfg->nof_channels=1;
+	dac_cfg->sampleType=DAC_SAMPLE_COMPLEXFLOAT;
+	free(buffer);
+
+	cfg_delete(&cfg);
+
+//	printf("sndcard_imp.c==>sndcard_readcfg(): P%d RETURN=1\n", i++);
+	return 1;
+	
+}
+
+
+int sndcard_init(struct dac_cfg *cfg, int *timeSlotLength, void (*sync)(void)) {
+	const char **ports;
+	const char *client_name = "ALOE";
+	const char *server_name = NULL;
+	jack_options_t options = JackNullOption;
+	jack_status_t status;
+	paTestData data;
+
+	printf("SNDCARD_INIT\n");
+	
+	/* Capture input/output buffer pointers*/
+	input = (_Complex float *)&cfg->dacinbuff[0][0];
+	output = (_Complex float *)&cfg->dacoutbuff[0][0];
+
+	syncFunction=sync;
+
+	/* Generate Test Signal*/
+	gensintable();
+
+	/* open a client connection to the JACK server */
+	client = jack_client_open(client_name, options, &status, server_name);
+	if (client == NULL) {
+		fprintf(stderr, "jack_client_open() failed, "
+			"status = 0x%2.0x\n", status);
+		if (status & JackServerFailed) {
+			fprintf(stderr, "Unable to connect to JACK server\n");
+		}
+		return -1;
+	}
+	if (status & JackServerStarted) {
+		fprintf(stderr, "JACK server started\n");
+	}
+	if (status & JackNameNotUnique) {
+		client_name = jack_get_client_name(client);
+		fprintf(stderr, " Unique name `%s' assigned\n", client_name);
+	}
+
+	/* tell the JACK server to call `process()' whenever
+	 there is work to be done.
+	 */
+	jack_set_process_callback(client, process,  0);	
+
+	/* tell the JACK server to call `jack_shutdown()' if
+	 it ever shuts down, either entirely, or if it
+	 just decides to stop calling us.
+	 */
+
+	jack_on_shutdown(client, jack_shutdown, 0);
+
+	jack_set_error_function(error);
+
+	/* display the current sample rate.
+	 */
+	printf("\nO__SOUND CARD PROPERLY INITIALLIZED___________________________________________________________________ \n");
+	printf("O  NsamplesIn=%d, NsamplesOut=%d                                                                  O \n", 
+			cfg->NsamplesIn, cfg->NsamplesOut);
+	printf("O  DAC buffer size = %" PRIu32 ", DAC sample rate: %" PRIu32"                                                     O \n",
+			jack_get_buffer_size(client),  jack_get_sample_rate(client));
+
+	SamplingFrequency = (int) jack_get_sample_rate(client);
+	*timeSlotLength=1000000*cfg->NsamplesOut/SamplingFrequency;
+
+	printf("O  WARNING; Required TimeSlot=%d (us). Please, setup accordingly at hw_api/lnx/cfg/platform.conf   O \n", *timeSlotLength);
+	printf("O__SOUND CARD PROPERLY INITIALLIZED___________________________________________________________________O \n");
+	
+/*	jack_set_sample_rate_callback(client, srate, 0);
+
+	jack_set_buffer_size_callback(client, bufferchg, 0);
+
+	if (jack_set_buffer_size(client,NofSamples)) {
+		 printf("error setting buffer size to %d\n",NofSamples);
+		 return -1;
+	 } 	 	jackctl_server_t 
+*/
+
+	/* create two input and two output ports */
+	//INPUTS
+	input_port1 = jack_port_register (client, "input1",
+					  JACK_DEFAULT_AUDIO_TYPE,
+					  JackPortIsInput, 0);
+	input_port2 = jack_port_register (client, "input2",
+					  JACK_DEFAULT_AUDIO_TYPE,
+					  JackPortIsInput, 0);
+	if ((input_port1 == NULL) || (input_port2 == NULL)) {
+		fprintf(stderr, "no more JACK ports available\n");
+		exit (1);
+	}	
+
+	//OUTPUT PORTS
+	output_port1 = jack_port_register (client, "output1",
+					  JACK_DEFAULT_AUDIO_TYPE,
+					  JackPortIsOutput, 0);
+	output_port2 = jack_port_register (client, "output2",
+					  JACK_DEFAULT_AUDIO_TYPE,
+					  JackPortIsOutput, 0);
+	if ((output_port1 == NULL) || (output_port2 == NULL)) {
+		fprintf(stderr, "no more JACK ports available\n");
+		exit (1);
+	}
+
+	/* Tell the JACK server that we are ready to roll.  Our
+	 * process() callback will start running now. */
+
+	if (jack_activate(client)) {
+		fprintf(stderr, "cannot activate client");
+		return -1;
+	}
+
+	/* Connect the ports.  You can't do this before the client is
+	 * activated, because we can't make connections to clients
+	 * that aren't running.  Note the confusing (but necessary)
+	 * orientation of the driver backend ports: playback ports are
+	 * "input" to the backend, and capture ports are "output" from
+	 * it.
+	 */
+ 	//OUTPUT
+	ports = jack_get_ports (client, NULL, NULL,
+				JackPortIsPhysical|JackPortIsInput);
+	if (ports == NULL) {
+		fprintf(stderr, "no physical playback ports\n");
+		exit (1);
+	}
+	if (jack_connect (client, jack_port_name (output_port1), ports[0])) {
+		fprintf (stderr, "cannot connect output ports\n");
+	}
+	if (jack_connect (client, jack_port_name (output_port2), ports[1])) {
+		fprintf (stderr, "cannot connect output ports\n");
+	}
+	jack_free (ports);
+	//INPUT
+	ports = jack_get_ports (client, NULL, NULL,
+				JackPortIsPhysical|JackPortIsOutput);
+	if (ports == NULL) {
+		fprintf(stderr, "no physical playback ports\n");
+		exit (1);
+	}
+	if (jack_connect (client, ports[0], jack_port_name (input_port1))) {
+		fprintf (stderr, "cannot connect output ports\n");
+	}
+	if (jack_connect (client, ports[1], jack_port_name (input_port2))) {
+		fprintf (stderr, "cannot connect output ports\n");
+	}
+	jack_free (ports);
+
+ 	/* install a signal handler to properly quits jack client */
+	signal(SIGQUIT, signal_handler);
+	signal(SIGTERM, signal_handler);
+	signal(SIGHUP, signal_handler);
+	signal(SIGINT, signal_handler);
+	/* keep running until the Ctrl+C */
+	sleep(2);
+	while (1) {
+		sleep (1);
+	}
+	jack_client_close (client);
+	return 1;
+}
+
+void sndcard_close() {
+	jack_client_close(client);
+
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////ORIGINAL
+/*int sndcard_readcfg(char *name, int *NsamplesIn, int *NsamplesOut) {
+	int i=0, j, offset;
+	char *buffer;
+	cfg_o cfg;
+	sect_o sect;
+	key_o freq,nsamples;
+
+	printf("sndcard_imp.c==>sndcard_readcfg()___________________________________________________CFG\n");
+	printf("sndcard_imp.c==>sndcard_readcfg(): Read File:/usr/local/etc/%s\n", name);
+	sprintf(filepath, "/usr/local/etc/%s", name);
+
+	hwapi_mem_silent(1);
+	offset = hwapi_res_parseall_(filepath, &buffer,1);
+	printf("sndcard_imp.c==>sndcard_readcfg(): offset=%d     CFG\n", offset);
+	if (offset < 0) {
+		printf ("Error reading file %s\n", filepath);
+		return 0;
+	}
+
+	cfg = cfg_new(buffer, offset);
+	if (!cfg) {
+		printf ("Error parsing file %s\n", filepath);
+		free(buffer);
+		return 0;
+	}
+	
+	sect = Set_get(cfg_sections(cfg),0);
+	if (!sect) {
+		printf("Error can't find any section\n");
+		free(buffer);
+		return 0;
+	}	
+	
+	if (strcmp(sect_title(sect), "main")) {
+		printf ("Error unknown section %s\n", sect_title (sect));
+		free(buffer);
+		return 0;
+	}
+	printf("sndcard_imp.c==>sndcard_readcfg(): P%d\n", 1);
+	freq=Set_find(sect_keys(sect),"sampling_freq",key_findname);
+	nsamples=Set_find(sect_keys(sect),"nof_samples",key_findname);
+	printf("sndcard_imp.c==>sndcard_readcfg(): P%d\n", 2);
+	if (!freq) {
+		printf("Error can't find sampling_freq field\n");
+		free(buffer);
+		return 0;
+	}
+	printf("sndcard_imp.c==>sndcard_readcfg(): P%d\n", 3);
+	if (!nsamples) {
+		printf("Error can't find nof_samples field\n");
+		free(buffer);
+		return 0;
+	}
+	printf("sndcard_imp.c==>sndcard_readcfg(): P%d\n", 4);
+	key_value(freq,0,PARAM_INT,&SamplingFrequency);	
+	key_value(nsamples,0,PARAM_INT,&NofSamples);	
+	printf("sndcard_imp.c==>sndcard_readcfg(): P%d\n", 5);
+	*NsamplesIn=NofSamples;
+	*NsamplesOut=NofSamples;
+	printf("sndcard_imp.c==>sndcard_readcfg(): P%d\n", 6);
+	free(buffer);
+	printf("sndcard_imp.c==>sndcard_readcfg(): P%d\n", 7);
+	cfg_delete(&cfg);
+	printf("sndcard_imp.c==>sndcard_readcfg(): P%d RETURN=1\n", i++);
+	return 1;
+	
+}
+*/
+/*
+int sndcard_init(int *ts_len, float *rxBuffer, float *txBuffer, void (*sync)(void)) {
+	const char **ports;
+	const char *client_name = "simple";
+	const char *server_name = NULL;
+	jack_options_t options = JackNullOption;
+	jack_status_t status;
+
+	printf("sndcard_imp.c==>sndcard_init()_____________________________________________INIT\n");
+
+	syncFunction=sync;
+
+	// Generate Test Signal
+	gensintable();
+
+	// open a client connection to the JACK server 
+	client = jack_client_open(client_name, options, &status, server_name);
+	if (client == NULL) {
+		fprintf(stderr, "jack_client_open() failed, "
+			"status = 0x%2.0x\n", status);
+		if (status & JackServerFailed) {
+			fprintf(stderr, "Unable to connect to JACK server\n");
+		}
+		return -1;
+	}
+	if (status & JackServerStarted) {
+		fprintf(stderr, "JACK server started\n");
+	}
+	if (status & JackNameNotUnique) {
+		client_name = jack_get_client_name(client);
+		fprintf(stderr, "unique name `%s' assigned\n", client_name);
+	}
+
+	// tell the JACK server to call `process()' whenever
+	// there is work to be done.
+	 
+
+	jack_set_process_callback(client, process, 0);
+
+	// tell the JACK server to call `jack_shutdown()' if
+	// it ever shuts down, either entirely, or if it
+	// just decides to stop calling us.
+	
+
+	jack_on_shutdown(client, jack_shutdown, 0);
+
+	jack_set_error_function(error);
+
+	// display the current sample rate.
+	 
+
+	printf("engine sample rate: %" PRIu32 "\n", jack_get_sample_rate(client));
+
+	SamplingFrequency = (int) jack_get_sample_rate(client);
+	*ts_len=1000000*NofSamples/SamplingFrequency;
+	
+	jack_set_sample_rate_callback(client, srate, 0);
+
+	jack_set_buffer_size_callback(client, bufferchg, 0);
+
+	if (jack_set_buffer_size(client,NofSamples)) {
+		 printf("error setting buffer size to %d\n",NofSamples);
+		 return -1;
+	 }
+
+
+	// create two ports 
+
+	input_port = jack_port_register(client, "input", JACK_DEFAULT_AUDIO_TYPE,
+			JackPortIsInput, 0);
+	output_port = jack_port_register(client, "output", JACK_DEFAULT_AUDIO_TYPE,
+			JackPortIsOutput, 0);
+
+	if ((input_port == NULL) || (output_port == NULL)) {
+		fprintf(stderr, "no more JACK ports available\n");
+		return -1;
+	}
+
+	input = rxBuffer;
+	output = txBuffer;
+
+	// Tell the JACK server that we are ready to roll.  Our
+	// process() callback will start running now. 
+
+	if (jack_activate(client)) {
+		fprintf(stderr, "cannot activate client");
+		return -1;
+	}
+
+	// Connect the ports.  You can't do this before the client is
+	// activated, because we can't make connections to clients
+	// that aren't running.  Note the confusing (but necessary)
+	// orientation of the driver backend ports: playback ports are
+	// "input" to the backend, and capture ports are "output" from
+	// it.
+	 
+
+	ports = jack_get_ports(client, NULL, NULL, JackPortIsPhysical
+			| JackPortIsOutput);
+	if (ports == NULL) {
+		fprintf(stderr, "no physical capture ports\n");
+		return -1;
+	}
+
+	if (jack_connect(client, ports[0], jack_port_name(input_port))) {
+		fprintf(stderr, "cannot connect input ports\n");
+	}
+
+	free(ports);
+
+	ports = jack_get_ports(client, NULL, NULL, JackPortIsPhysical
+			| JackPortIsInput);
+	if (ports == NULL) {
+		fprintf(stderr, "no physical playback ports\n");
+		return -1;
+	}
+
+	if (jack_connect(client, jack_port_name(output_port), ports[0])) {
+		fprintf(stderr, "cannot connect output ports\n");
+	}
+
+	free(ports);
+
+	return 1;
+}
+*/
+

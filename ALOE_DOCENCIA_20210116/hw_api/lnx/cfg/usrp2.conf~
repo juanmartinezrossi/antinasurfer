@@ -1,0 +1,35 @@
+
+
+main {
+	address=not_used
+	
+	#internal,external
+	clock=internal 
+	
+	# Indicates which flow governs the time-slot
+	sync_on=tx
+	
+	# Only half-duplex is supported
+	chain=tx
+}
+
+# value=0 set to default
+tx {
+	samp_freq=7168000
+	freq=900000000
+	gain=0.0
+	bw=0.0
+	blocksize=3584
+}
+
+# value=0 set to default
+rx {
+	samp_freq=1777778
+	freq=2400000000
+	gain=30.0
+	bw=0.0
+	blocksize=896
+}
+
+
+	

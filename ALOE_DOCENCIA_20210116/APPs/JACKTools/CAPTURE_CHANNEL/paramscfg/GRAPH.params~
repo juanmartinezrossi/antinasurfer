@@ -1,0 +1,93 @@
+# 0: No Capture, 1: Text Data Files, 2: Bin Data Files
+parameter {
+	name = captureDATA
+	value = 0
+}
+# PUT THE PROPER TEST NAME HERE
+parameter {
+	name = test
+	value = LAB2_CTRL
+}
+# Number of time slots to capture
+parameter {
+	name = TS2capture
+	value = 60000
+}
+#------------------------------------------------------------------
+# bypass; 0: No Bypass data, 1: Bypass data
+parameter {
+	name = bypass
+	value = 0
+}
+parameter {
+	name = delayBypass
+	value = 0
+}
+
+# inputtype: "COMPLEXFLOAT", "FLOAT", "INT", "CHAR"
+parameter {
+	name = inputtype
+	value = COMPLEXFLOAT
+}
+# outputtype: "COMPLEXFLOAT", "FLOAT", "INT", "CHAR"
+parameter {
+	name = outputtype
+	value = COMPLEXFLOAT
+}
+#------------------------------------------------------------------
+# PLOT_MODE
+#	 	0x0: None;						
+#		0x1: Time;
+#		0x2: Spectrum;
+#		0x4: Constellation
+#		0x7: Alltogether
+
+parameter {
+	name = plot_mode
+	value = 3
+}
+# numsampl2view: Data is not plot until numsampl2view has been received
+parameter {
+	name = numsampl2view
+	value = 1024
+}
+
+# plot_periodTS: Defines the number of Time slot to skip before to plot again
+# Use 1 for executing step by step.
+# Use a big enough number to avoid to stress the equipment due to plotting
+parameter {
+	name = plot_periodTS
+	value = 10
+}
+# LOGSCALE: dB Scale for FFT plotting: 0=Linear Scale; 1=dB Scale
+parameter {
+	name = logscale
+	value = 1
+}
+
+# samplingfreqHz: A value in Hz. Use 1.0 when refers to samples
+parameter {
+	name = samplingfreqHz
+	value = 48000.0
+}
+
+parameter {
+	name = fftsize
+	value = 1024
+}
+
+# AVERAGED FFT: 0=Non Averaged; 1: Averaged
+parameter {
+	name = averagefft
+	value = 0
+}
+
+# Persistence of history in average
+parameter {
+	name = mu
+	value = 0.1
+}
+
+
+
+

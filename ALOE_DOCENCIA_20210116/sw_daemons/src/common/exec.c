@@ -1,0 +1,317 @@
+/*
+ * execinfo.c
+ *
+ * Copyright (c) 2009 Ismael Gomez-Miguelez, UPC <ismael.gomez at tsc.upc.edu>. All rights reserved.
+ *
+ *
+ * This file is part of ALOE.
+ *
+ * ALOE is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * ALOE is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with ALOE.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+#include <stdlib.h>
+#include <string.h>
+
+#include "phid.h"
+
+#include "phal_hw_api.h"
+
+#include "str.h"
+#include "set.h"
+#include "swman.h"
+#include "exec.h"
+
+#define T execinfo_o
+
+extern struct platforms_cfg platforms_cfg[];
+
+T execinfo_new()
+{
+    T obj;
+
+    NEW(obj);
+    if (!obj) {
+        return NULL;
+    }
+    obj->name = str_new();
+    if (!obj->name) {
+        execinfo_delete(&obj);
+        return NULL;
+    }
+    obj->versions = Set_new(0,NULL);
+    if (!obj->versions) {
+        execinfo_delete(&obj);
+        return NULL;
+    }
+    return obj;
+}
+
+void execinfo_delete(T * obj)
+{
+    assert(*obj);
+
+    if ((*obj)->name) {
+        str_delete(&(*obj)->name);
+    }
+    if ((*obj)->versions) {
+        Set_destroy(&(*obj)->versions, execimp_xdelete);
+    }
+
+    DELETE(*obj);
+    obj = NULL;
+}
+
+T execinfo_dup(T obj)
+{
+    T newobj;
+
+    assert(obj);
+
+    NEW(newobj);
+    if (newobj) {
+        newobj->name = str_dup(obj->name);
+        newobj->versions = Set_dup(obj->versions, execimp_xdup);
+    }
+
+    return newobj;
+}
+
+void execinfo_xdelete(void **x)
+{
+    execinfo_delete((T*) x);
+}
+
+void * execinfo_xdup(const void *x)
+{
+    return (void *) execinfo_dup((T) x);
+}
+
+
+int execinfo_findname(const void *x, const void *member)
+{
+    T obj = (T) member;
+
+    return str_cmp(obj->name, (str_o) x);
+}
+
+
+
+#undef T
+#define T execimp_o
+
+T execimp_new()
+{
+    T obj;
+
+    NEW(obj);
+
+    return obj;
+}
+
+void execimp_delete(T * obj)
+{
+    assert(*obj);
+
+    DELETE(*obj);
+    obj = NULL;
+}
+
+T execimp_dup(T obj)
+{
+    T newobj;
+
+    assert(obj);
+
+    NEW(newobj);
+    if (newobj) {
+        memcpy(newobj,obj,sizeof(T));
+    }
+
+    return newobj;
+}
+
+int execimp_pinfotopkt(void *x, char **start, char *end) {
+
+    T obj = (T) x;
+
+    assert(obj && start && end);
+    assert(end >= *start && *start);
+
+    if ((end - *start) < sizeof (struct pinfo)) {
+        return 0;
+    }
+
+    memcpy(*start, &obj->pinfo, sizeof (struct pinfo));
+    *start += sizeof (struct pinfo);
+
+    return 1;
+}
+
+
+int execimp_popbindata(void *x, char **start, char *end) {
+    int t, n, i;
+    T obj = (T) x;
+    unsigned char *p;
+
+    assert(x && start && end);
+    assert(end >= *start && *start);
+
+    if ((end - *start) < DEFAULT_PKT_SZ) {
+        return 0;
+    }
+    
+    n = hwapi_res_read(obj->fd, *start, DEFAULT_PKT_SZ);
+    if (n < 0) {
+        printf("Error reading file");
+        return -1;
+    }
+
+    t = n;
+    p = (unsigned char*) * start;
+    for (i = 0; i < t; i++) {
+        obj->checksum += p[i];
+    }
+
+    *start += n;
+/*    printf("packet %d checksum 0x%x\n",cnt,exeobj->checksum);
+    cnt++;
+*/
+    return 1;
+}
+
+
+void execimp_xdelete(void **x)
+{
+    execimp_delete((T*) x);
+}
+
+void * execimp_xdup(const void *x)
+{
+    return (void *) execimp_dup((T) x);
+}
+
+int execimp_findplatformbinary(const void *x, const void *member)
+{
+    T obj = (T) member;
+
+    if (obj->platform == *((int*) x) && obj->mode == BINARY) {
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
+int execimp_findplatformsource(const void *x, const void *member)
+{
+    T obj = (T) member;
+
+    if (obj->platform == *((int*) x) && obj->mode == SOURCE) {
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
+char exe_name[MAX_PATH_LEN];
+char rel_exe_name[MAX_PATH_LEN];
+
+
+int execimp_open(T obj)
+{
+    int i;
+	static int flag=0;
+	static int numModules=0;
+
+	if(flag==0){
+		printf("O============================================================================================O\n");
+		printf("LOADING Executable modules code ... \n");
+		
+	}
+/*	printf("execimp_open()\n");*/
+
+    for (i = 0; i < NOF_PLATS; i++) {
+        if (platforms_cfg[i].plt_id == obj->platform) {
+            break;
+        }
+    }
+    if (i == NOF_PLATS) {
+        printf("Platform Id unknown. (%d)", obj->platform);
+        return 0;
+    }
+
+    if (!hwapi_hwinfo_isDebugging()) {
+        switch(platforms_cfg[i].mem_mode) {
+            case RELATIVE:
+				if(flag==0)printf("NO Debugging.mem_mode=RELATIVE\n");
+				/*printf("exe_name0=%s\n", exe_name);*/
+                sprintf(exe_name, "%s/%s/%s", EXECS_BASE_DIR, platforms_cfg[i].dir,
+                    str_str(obj->name));
+				printf("exe_module_%d = %s\n", numModules, exe_name);
+                break;
+            case ABSOLUTE:
+				if(flag==0)printf("NO Debugging.mem_mode=ABSOLUTE\n");
+                sprintf(exe_name, "%s/%s/%s.0x%x", EXECS_BASE_DIR, platforms_cfg[i].dir,
+                    str_str(obj->name), obj->pinfo.mem_start);
+                break;
+        }
+    } else {
+		printf("Debugging\n");
+        sprintf(exe_name, "../modules/%s/lnx_make/bin/%s", str_str(obj->name),str_str(obj->name));
+    }
+	flag=1;
+	numModules++;
+
+    obj->fd = hwapi_res_open(exe_name, FLOW_READ_ONLY, &obj->pinfo.blen);
+    if (obj->fd < 0) {
+        printf("Executable not available, generating...");
+
+        switch (obj->mode) {
+        case SOURCE:
+            /* compile */
+            break;
+        case BINARY:
+            /* relocate */
+            switch(obj->platform & 0xF0) {
+                case PLATFORM_LIN:
+                    /* can't relocate linux */
+                    return 0;
+                case PLATFORM_TI:
+                    sprintf(exe_name, "%s/%s/%s", EXECS_BASE_DIR, platforms_cfg[i].dir,
+                        str_str(obj->name));
+                    sprintf(rel_exe_name,"%s.0x%x",exe_name,obj->pinfo.mem_start);
+                    printf("Calling c6000 linker...\n");
+                    if (!hwapi_comp_relocate(exe_name,rel_exe_name,obj->pinfo.mem_start,obj->pinfo.mem_sz)) {
+                        printf("Error calling linker");
+                        return 0;
+                    }
+                    obj->fd = hwapi_res_open(rel_exe_name, FLOW_READ_ONLY, &obj->pinfo.blen);
+                    if (obj->fd<0) {
+                        printf("Error opening exec file %s\n",exe_name);
+                        return 0;
+                    }
+                    return 1;
+            }
+            return 0;
+        }
+    }
+    return 1;
+}
+
+void execimp_close(T obj)
+{
+    if (obj->fd) {
+        hwapi_res_close(obj->fd);
+        obj->fd = 0;
+    }
+}

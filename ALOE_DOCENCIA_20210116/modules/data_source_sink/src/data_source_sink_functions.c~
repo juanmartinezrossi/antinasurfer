@@ -1,0 +1,172 @@
+/* 
+ * Copyright (c) 2012, Ismael Gomez-Miguelez <ismael.gomez@tsc.upc.edu>.
+ * This file is part of ALOE++ (http://flexnets.upc.edu/)
+ * 
+ * ALOE++ is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * ALOE++ is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with ALOE++.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/* Functions that generate the test data fed into the DSP modules being developed */
+#include <complex.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#include "data_source_sink_functions.h"
+
+/**
+ * @brief Defines the function activity.
+ * @param .
+ *
+ * @param lengths Save on n-th position the number of samples generated for the n-th interface
+ * @return -1 if error, the number of output data if OK
+
+ */
+long int read_file(char *filename, char *databuff, long int size){
+	long int readlength=0;
+	FILE *fp;
+
+	printf("%s\n", filename);
+	fp=fopen(filename, "r");
+	readlength=fread(databuff,1,size,fp);
+	if(size != readlength){
+		printf("Reading filename %s: read data=%ld, expected=%ld\n", filename, readlength, size);
+	}
+	fclose(fp);
+	return(readlength);
+}
+
+
+long int read_file_bin(char *filename, char *databuff, long int size){
+	long int readlength=0;
+	FILE *fp;
+
+	printf("%s\n", filename);
+	fp=fopen(filename, "rb");
+	readlength=fread(databuff,1,size,fp);
+	if(size != readlength){
+		printf("Reading filename %s: read data=%ld, expected=%ld\n", filename, readlength, size);
+	}
+	fclose(fp);
+	return(readlength);
+}
+
+
+long int write_file(char *filename, char *databuff, long int size){
+	long int writelength=0;
+	FILE *fp;
+
+	fp=fopen(filename, "w");
+	writelength=fwrite(databuff,1,size,fp);
+	if(size != writelength){
+		printf("Writing filename %s: wrote data=%ld, expected=%ld\n", filename, writelength, size);
+	}
+	fclose(fp);
+	return(writelength);
+}
+
+long int write_file_bin(char *filename, char *databuff, long int size){
+	long int writelength=0;
+	FILE *fp;
+
+	fp=fopen(filename, "wb");
+	writelength=fwrite(databuff,1,size,fp);
+	if(size != writelength){
+		printf("Writing filename %s: wrote data=%ld, expected=%ld\n", filename, writelength, size);
+	}
+	fclose(fp);
+	return(writelength);
+}
+
+#define NUMMIN_ERRORS		0
+#define NUMTS2PRINT_BER		250
+/**
+ * @brief Compare the received bytes with the reference file.
+ * @param .
+ *
+ * @param lengths Save on n-th position the number of samples generated for the n-th interface
+ * @return -1 if error, the number of output data if OK
+
+ */
+int compare_data(char *file, long int filelength, char *data_in, int datalength, float *BER){
+
+    static long int count=0;
+	static int numbitserror=0;
+    unsigned char byte;
+    int i, n;
+    static int Tslot=0;
+
+	if(count<filelength){		//Check the file length
+		for (i=0; i<datalength; i++){
+			byte=*(data_in+i)^*(file+count);
+			if(byte!=0){
+				for(n=0; n<8; n++){
+//					printf("byte=%x\n",byte&0x01);
+					numbitserror=numbitserror+(byte&0x01);
+					byte=byte>>1;
+//					printf("numbitserror=%d\n",numbitserror);
+				}
+			}
+//			printf("count=%d\n", count);
+			count++;	
+		}
+		//printf("numbitserror=%d\n",numbitserror);
+	}
+	else {
+		printf("Data bytes received = %ld longer than file length=%ld\n", count, filelength);
+		if(numbitserror>=NUMMIN_ERRORS){
+			//printf("AAnumbitserror=%d\n",numbitserror);
+			*BER=(float)(numbitserror)/(float)(count*8);
+			printf("FILE RECEIVED: BER = %1.6f, numbitserror=%d\n",*BER, numbitserror);
+		}else{
+			printf("FILE RECEIVED: numerrors=%d < NUMMIN_ERRORS=%d and BER can not be calculated\n",numbitserror, NUMMIN_ERRORS);
+		}
+		return(-1);
+	}
+	if(Tslot==0)printf("\n");
+	if(Tslot%NUMTS2PRINT_BER == 0){
+		*BER=(float)(numbitserror)/(float)(count*8);
+		printf("!!!!!!!!!!!!!!!!!! CURRENT BER = %1.6f, numbitserror=%d\n",*BER, numbitserror);
+	}
+
+	Tslot++;
+    return(1);
+}
+
+long int addIDbin(int *databuff){
+	long int writelength=0;
+	int readbuff[32];
+	int readlength=0;
+	int i, flag=0;
+	FILE *fp;
+
+	fp=fopen(".NOFILE", "ab+");
+	readlength=fread(readbuff,sizeof(int),32,fp);
+
+/*	printf("readlength=%d\n", readlength);*/
+	for(i=0; i<readlength; i++){
+/*		printf("readbuff[i]=%d, *databuff=%d\n", readbuff[i], *databuff);*/
+		if(readbuff[i] == (*databuff))flag=1;
+	}
+	if(flag==0){
+		writelength=fwrite(databuff,1,sizeof(int),fp);
+	} else{
+		fseek(fp, sizeof(int), SEEK_END);
+		fread(databuff, sizeof(int), 1, fp);
+	}
+
+	fclose(fp);
+	return(writelength);
+}
+
+

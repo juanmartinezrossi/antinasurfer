@@ -1,0 +1,48 @@
+
+# 1: Noise Only, 2: SUI+Noise, 
+parameter {
+	name = ChannelModel
+	value = 1
+}
+# 1: SNR, 2: Noise Power
+parameter {
+	name = NoiseModel
+	value = 1
+}
+# The SNR real value is SRNreal=SNR-10dBs
+parameter {
+	name = SNR
+	value = 50.0
+}
+parameter {
+	name = NoiseVariance
+	value = 0.0
+}
+
+# 0: NO SUI CHANNEL, 1: SUI1, 2:SUI2, 3:SUI3, 4:SUI4, 5:SUI5, 6:SUI6
+parameter {
+	name = SUIchannel
+	value = 0
+}
+parameter {
+	name = gain
+	value = 1.0
+}
+parameter {
+	name = samplingfreq
+	value = 30720000.0
+}
+# 1: AD not active Model; 2: AD active Model (generate noise data from starting execution)
+# When AD active always rcv_samples=1024
+parameter {
+	name = AD_Active
+	value = 1
+}
+
+# 1) NON ACTIVE, 2) ACTIVE. Debug Check the impluse response of SUI channel. Inject a delta at module input
+parameter {
+	name = debugg
+	value = 1
+}
+
+

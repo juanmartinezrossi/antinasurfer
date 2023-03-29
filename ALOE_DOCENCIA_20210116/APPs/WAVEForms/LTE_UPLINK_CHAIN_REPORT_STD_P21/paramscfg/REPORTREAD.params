@@ -1,0 +1,14 @@
+#opMODE=0; 						//O: Normal CTRL operation, 1: Read&Print CTRL file
+parameter {
+	name = opMODE
+	value = 1
+}
+
+
+parameter {
+	name = UserName
+	value = NameSurname1Surname2
+}
+
+
+

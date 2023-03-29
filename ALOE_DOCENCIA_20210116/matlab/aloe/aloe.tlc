@@ -1,0 +1,115 @@
+%% SYSTLC: ALOE Real-Time Target \
+%%    TMF: lnx_unix.tmf MAKE: make_lnx EXTMODE: ext_comm 
+%%
+%% $RCSfile: lnx.tlc,v $
+%% $Revision: 1.7 $
+%% $Date: 2007/01/18 14:35:45 $
+%%
+%% Author: Dan Bhanderi, 2005
+%%
+%selectfile NULL_FILE
+
+%assign TargetType = "RT"
+%assign Language   = "C"
+%assign GenRTModel = 1
+%assign _GRT_      = 1
+
+%assign MatFileLogging = 1
+
+%include "codegenentry.tlc"
+
+
+%% The contents between 'BEGIN_RTW_OPTIONS' and 'END_RTW_OPTIONS' in this file
+%% are used to maintain backward compatibility to R13 and preR13 custom target 
+%% file only.  If you want to use this file as a template to develop your
+%% own system target file, you need to remove the 'CONFIGSET_TARGET_COMPONENT'
+%% section at the end of this file.
+%%
+/%
+  BEGIN_RTW_OPTIONS
+
+  rtwoptions(1).prompt         = 'ALOE Target code generation options';
+  rtwoptions(1).type           = 'Category';
+  rtwoptions(1).enable         = 'on';  
+  rtwoptions(1).default        = 6;   % number of items under this category
+                                      % excluding this one.
+  rtwoptions(1).popupstrings  = '';
+  rtwoptions(1).tlcvariable   = '';
+  rtwoptions(1).tooltip       = '';
+  rtwoptions(1).callback      = '';
+  rtwoptions(1).opencallback  = '';
+  rtwoptions(1).closecallback = '';
+  rtwoptions(1).makevariable  = '';
+
+  rtwoptions(2).prompt       = 'Post compile command: ';
+  rtwoptions(2).type         = 'Edit';
+  rtwoptions(2).default      = '';
+  rtwoptions(2).tlcvariable  = 'PostCompileCommand';
+  rtwoptions(2).makevariable = 'PC_CMD';
+  rtwoptions(2).tooltip      = [ ...
+    '(EXPERIMENTAL) Specify command to execute after compilation of ' ...
+    'binary, e.g. to upload to remote target with rsync or scp.'];
+
+  rtwoptions(3).prompt       = 'Linker options: ';
+  rtwoptions(3).type         = 'Edit';
+  rtwoptions(3).default      = '-lm';
+  rtwoptions(3).tlcvariable  = 'LinkerOptions';
+  rtwoptions(3).makevariable = 'LD_OPTS';
+  rtwoptions(3).tooltip      = [ ...
+    'Specify options to the linker, e.g. -lm to reference the math archive m.a.'];
+
+  rtwoptions(4).prompt       = 'Target architecture: ';
+  rtwoptions(4).type         = 'Edit';
+  rtwoptions(4).default      = 'GLNX86';
+  rtwoptions(4).tlcvariable  = 'TargetArch';
+  rtwoptions(4).makevariable = 'TARGET_ARCH';
+  rtwoptions(4).tooltip      = [ ...
+    'Target machine CPU architecture. This allows for gcc options to ' ...
+    'be configured in rtw/c/tools/unixtools.mk. If the architecture is '...
+    'not supported by RTW as standard, edit this file with custom ' ...
+    'compile options.']; 
+
+  rtwoptions(5).prompt       = 'Specify remote paths';
+  rtwoptions(5).type         = 'Checkbox';
+  rtwoptions(5).default      = 'off';
+  rtwoptions(5).callback     = 'lnx_callback(hDlg,hSrc,''CustomPath'');';
+  rtwoptions(5).tlcvariable  = 'CustomPath';
+  rtwoptions(5).makevariable = 'CUSTOM_PATH';
+  rtwoptions(5).tooltip      = [ ...
+    'Matlab install path must be specified if different from ' ...
+    'host, when generating code for remote compilation.'];
+
+  rtwoptions(6).prompt       = 'Matlab installation path: ';
+  rtwoptions(6).type         = 'Edit';
+  rtwoptions(6).default      = '/home/odissey09/matlab_files';
+  rtwoptions(6).tlcvariable  = 'MatlabPath';
+  rtwoptions(6).makevariable = 'MATLAB_PATH';
+  rtwoptions(6).tooltip      = [ ...
+    'Matlab installation path on remote compile target.'];
+
+  rtwoptions(7).prompt       = 'Path to target files: ';
+  rtwoptions(7).type         = 'Edit';
+  rtwoptions(7).default      = '/home/odissey09/matlab_files/rtw/c/aloe';
+  rtwoptions(7).tlcvariable  = 'TargetPath';
+  rtwoptions(7).makevariable = 'TARGET_PATH';
+  rtwoptions(7).tooltip      = [ ...
+    'Path to target files on remote compile target.'];
+
+  %----------------------------------------%
+  % Configure RTW code generation settings %
+  %----------------------------------------%
+
+  rtwgensettings.DerivedFrom = 'grt.tlc';
+  rtwgensettings.Version        = '1';
+  rtwgensettings.BuildDirSuffix = '_aloe_rtw';
+  rtwgensettings.SelectCallback = [ ...
+    'if isunix ', ...
+    'slConfigUISetVal(hDlg, hSrc, ''TargetPath'', lnx_install_dir);', ...
+    'else ', ...
+    'slConfigUISetVal(hDlg, hSrc, ''CustomPath'', ''on'');', ...
+    'end; ', ...
+    'lnx_callback(hDlg,hSrc,''CustomPath'');', ...
+    ];
+
+  END_RTW_OPTIONS 
+ %/

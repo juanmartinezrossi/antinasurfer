@@ -1,0 +1,417 @@
+/* 
+ * Copyright (c) 2012
+ * This file is part of ALOE (http://flexnets.upc.edu/)
+ * 
+ * ALOE++ is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * ALOE++ is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with ALOE++.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/* Functions that generate the test data fed into the DSP modules being developed */
+#include <complex.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#include "CHANNEL_ANALYZER_functions.h"
+
+/**
+ * @brief Defines the function activity.
+ * @param .
+ *
+ * @param datalength: Number of samples
+ * @param pulselength: Length of the pulse generated.
+ * @param gain: Value of the pulse.
+ * @return -1 if error, the number of output data if OK
+
+ */
+int init_pulse_COMPLEX(_Complex float *input, int datalength, int pulselength, float gain){
+	int i;
+
+	for (i=0;i<datalength;i++) {
+		if(i < pulselength)__real__ input[i]=gain*1.0;
+		else __real__ input[i]=0.0;
+		__imag__ input[i]=0.0;
+	}
+
+	return(1);
+}
+
+
+/**
+ * @brief Defines the function activity.
+ * @param .
+ *
+ * @param lengths Save on n-th position the number of samples generated for the n-th interface
+ * @return -1 if error, the number of output data if OK
+
+ */
+int bypass_COMPLEX(_Complex float *input, int inlength, _Complex float *output)
+{
+	int i,outlength;
+
+	for (i=0;i<inlength;i++) {
+		__real__ output[i] = __real__ input[i];
+		__imag__ output[i] = __imag__ input[i];
+	}
+	outlength=inlength;
+	return outlength;
+}
+
+int init_toneCOMPLEX(_Complex float *table, int length, float ref_freq, float gain, float sampl_freq){
+	int i;
+	double arg=PIx2/((float)length);
+
+	for (i=0;i<length;i++) {
+		__real__ table[i]=gain*(float)cos(arg*(float)i);
+		__imag__ table[i]=gain*(float)sin(arg*(float)i);
+	}
+	return(1);
+}
+
+int gen_toneCOMPLEX(_Complex float *func_out, _Complex float *tablel, int tablesz, 
+					int datalen, float ref_freq, float tone_freq, float sampl_freq){
+	int i, k=1;
+	static int j=0;
+	float ref_freq_c;
+
+	ref_freq_c=sampl_freq/(float)tablesz;
+	k=(int)(tone_freq/ref_freq_c);
+	for (i=0;i<datalen;i++) {
+		func_out[i] = tablel[j];
+		j += k;
+		if(j>=tablesz)j-=tablesz;
+	}
+	return(1);
+}
+
+int gen_cosinus_REAL_COMPLEX(_Complex float *func_out, _Complex float *tablel, int tablesz,
+					int datalen, float ref_freq, float tone_freq, float sampl_freq){
+	int i, k=1;
+	static int j1=0;
+	float ref_freq_c;
+
+//	printf("gen_cosinus_REAL_COMPLEX: sampl_freq=%d\n", sampl_freq);
+
+	ref_freq_c=sampl_freq/(float)tablesz;
+	k=(int)(tone_freq/ref_freq_c);
+	for (i=0;i<datalen;i++) {
+		__real__ func_out[i]=__real__  tablel[j1];
+		__imag__ func_out[i]= 0.0;
+		j1 += k;
+		if(j1>=tablesz)j1-=tablesz;
+	}
+	return(1);
+}
+
+
+// Detect if signal is over some threshold
+int detect_rcv_data(_Complex float *in, int length, float threshold){
+
+	int i;
+	int numsample=0;
+	for(i=0; i<length; i++){
+		if((__real__ *(in+i)) >= threshold)numsample=1+i;	// if signal has been detected
+		if((__imag__ *(in+i)) >= threshold)numsample=1+i;
+		if(numsample>0){
+			//printf("numsample=%d\n", numsample-1);
+			return(numsample);
+		}
+	}
+	return 0; 	// If no signal detected
+}
+
+/*int delay(_Complex float *in, int length, float threshold, int Tslot){
+
+	static int detected=0;
+
+	if(detected==0){
+		detected=detect_rcv_data(in, length, threshold);
+		return(0);
+	}
+	if(detected==1){
+		printf("signal detected, Tslot=%d\n", Tslot);
+		detected=2;
+		return(Tslot);
+	}
+	return(0);
+}*/
+
+int delay(_Complex float *in, int length, float threshold, int Tslot, float samplingfreq){
+
+	static int detected=0;
+
+	if(detected==0){
+		detected=detect_rcv_data(in, length, threshold);
+		printf("\nNumber of Tslot delayed=%d\n", Tslot);
+		printf("Number of samples delayed from Tslot origin=%d\n", detected);
+		printf("Total Delay=%3.6f sec\n", ((float)(length*Tslot) + detected)/samplingfreq);
+		if(detected > 0)return(Tslot);
+	}
+	return(0);
+}
+
+
+float get_CH_gaindBs(_Complex float *in, int length){
+	int i;
+	static float lastG=-60.0;
+	float MAX=-1000000.0,MIN=1000000.0, gaindBs, Amplitude;
+
+	for(i=0; i<length; i++){
+		if(MAX < __real__ in[i]){
+			MAX=__real__ in[i];
+		}
+		if(MIN > __real__ in[i]){
+			MIN=__real__ in[i];
+		}
+	}
+	Amplitude=(MAX-MIN)/2.0;
+	gaindBs=(float)(20.0*log10(Amplitude));
+//	gaindBs=(0.8*gaindBs+0.2*lastG)/2.0;
+//	lastG=gaindBs;
+	//printf("MAX=%3.1f, MIN=%3.1f, Amplitude=%3.4f, GaindB=%3.4f\n", MAX, MIN, Amplitude, gaindBs);
+
+
+	return(gaindBs);
+}
+
+
+/*
+float get_CH_phase_rad(_Complex float *localcos, _Complex float *input, int length, _Complex float *Cprod){
+
+	int i;
+	float product[2048*10], MAXa=-100000000.0, MINa=100000000.0, VM, phase, recvA, to, freq, aux;
+	double  arg;
+	static float lastval=-10.0;
+	static float signn=-1.0;
+	static float MAXA=-3.14, MINA=3.14;
+
+	// Compute product and Find input Amplitude
+	for(i=0; i<length;i++){
+		product[i]=__real__ localcos[i]*__real__ input[i];
+		//product[i]=__real__ (localcos[i]*input[i]);
+
+		__real__ Cprod[i] = product[i];
+		__imag__ Cprod[i] = 0.0; //(float)(i%10);;
+	}
+//	recvA=(MAX-MIN)/2.0;
+//	printf("recvA=%3.5f\n", recvA);
+
+	// Find product MAX/MIN
+	MAXa=-100000000.0, MINa=100000000.0;
+	//for(i=0; i<length; i++){
+	for(i=200; i<length-200; i++){
+		if(MAXa < product[i]){
+			MAXa=product[i];
+		}
+		if(MINa > product[i]){
+			MINa=product[i];
+		}
+	}
+	VM=(MAXa+MINa)/2.0;
+	recvA=(MAXa-MINa)/2.0;
+
+
+	arg=(double)(VM/(recvA));
+
+	printf("MAXa=%3.5f, MINa=%3.5f, VM=%3.5f, recvA=%3.5f, arg=%3.5lf, ", MAXa, MINa, VM, recvA, arg);
+//	printf("VM=%3.5f\n", VM);
+
+	if(arg > 1.0)arg=1.0;
+	if(arg < -1.0)arg=-1.0;
+	phase=(float)acos(arg);
+	if(isnan(phase)){
+		printf("ISNAN\n");
+		phase=0.0;
+	}
+	printf("phase0=%3.5f\n", phase);
+
+
+	return(phase);
+}
+*/
+
+float get_CH_phase_rad(_Complex float *localcos, _Complex float *input, int length, _Complex float *Cprod){
+
+	int i;
+	float product[2048*10], MAXa=-100000000.0, MINa=100000000.0, VM, phase, recvA, to, freq, aux;
+	double  arg;
+	static float lastval=-10.0;
+	static float signn=-1.0;
+	static int first=0;
+	static float MAXA=-3.14, MINA=3.14;
+
+	// Compute product and Find input Amplitude
+	for(i=0; i<length;i++){
+		product[i]=__real__ localcos[i]*__real__ input[i];
+		__real__ Cprod[i] = product[i];
+		__imag__ Cprod[i] = 0.0; 
+	}
+	// Find product MAX/MIN
+	MAXa=-100000000.0, MINa=100000000.0;
+	for(i=200; i<length-200; i++){
+		if(MAXa < product[i]){
+			MAXa=product[i];
+		}
+		if(MINa > product[i]){
+			MINa=product[i];
+		}
+	}
+	VM=(MAXa+MINa)/2.0;
+	recvA=(MAXa-MINa)/2.0;
+
+
+	arg=(double)(VM/(recvA));
+
+//	printf("\nMAXa=%3.5f, MINa=%3.5f, VM=%3.5f, recvA=%3.5f, arg=%3.5lf, ", MAXa, MINa, VM, recvA, arg);
+
+	if(arg > 1.0)arg=1.0;
+	if(arg < -1.0)arg=-1.0;
+	phase=(float)acos(arg);
+	if(isnan(phase)){
+		printf("ISNAN\n");
+		phase=0.0;
+	}
+	printf("phase0=%3.5f\n", phase);
+	return(phase);
+}
+
+void correct_phase(float *phasein, int length, float *cphaseout){
+	float MAXA=-10000000.0, MINA=10000000.0, signnMAX, signnMIN;
+	int max[512];
+	int min[512];
+	int signMAX[1204*8];
+	int signMIN[1204*8];
+	int signNN[1204*8];
+	int i, j, k, idxMAX=0, idxMIN=0, imin=0;
+
+	// CAPTURE MAX
+	for(i=0; i<length; i++){
+		if(MAXA < phasein[i]) {
+			MAXA=phasein[i];
+			if(MAXA > 3.0){
+				max[idxMAX]=i;
+				idxMAX++;
+				MAXA=-10000000.0;
+			}
+		}
+	}
+
+/*	printf("MAX\n");
+	for(i=0; i<idxMAX; i++)printf("%d,", max[i]);
+	printf("\n");
+*/
+	// CAPTURE MIN
+	for(i=0; i<length; i++){
+		if(MINA > phasein[i]) {
+			MINA=phasein[i];
+			if(MINA < 0.4){
+				min[idxMIN]=i;
+				idxMIN++;
+				MINA=10000000.0;
+			}
+		}
+	}
+/*	printf("MIN\n");
+	for(i=0; i<idxMIN; i++)printf("%d,", min[i]);
+	printf("\n");
+*/
+	// CORRECT PHASE
+	j=0;
+	k=0;
+	for(i=0; i<length; i++){
+		if(i==max[j])if(j < idxMAX){
+			j++;
+			if(max[j+1]>min[k])signnMAX=1.0;
+		}
+		if(i==min[k])if(k < idxMIN){
+			k++;
+			if(min[k+1]>max[j])signnMAX=-1.0;
+		}
+		signNN[i]=signnMAX;
+		cphaseout[i]=phasein[i]*signNN[i];
+	}
+
+}
+
+
+
+
+/*void readCPLXfilecoeff(_Complex float *filtercoeff, int *filterlength, char *filtername){
+
+	char str[128];
+	float auxf;
+	int num, k=0;
+	float real=0.0, imag=0.0;
+	char sign; 
+
+	//strcpy(str, "../../APPs/");
+	//strcat(str, filtername);
+	//printf("%s\n", filtername);
+
+	//Reading the file from .txt file 
+    FILE *hFile;
+   // hFile = fopen("/home/antoni/DADES/NOU_DADES/DOCENCIA/ASSIGNATURES/ESR/ALOE_DOCENCIA/ALOE-1.6_DOCENCIA_WORKING_OCT16/APPs/WAVEForms/FILTER/paramscfg/FIR.coeff", "r");
+	// OK hFile = fopen("../../../APPs/WAVEForms/FILTER/paramscfg/FIR.coeff", "r");
+	//hFile = fopen("paramscfg/FIR.coeff", "r");
+	hFile = fopen(filtername, "r");
+     
+    if (hFile == NULL){
+        printf("\033[1m\033[31mERROR!!!. FILE %s NOT FOUND\033[0m\n", filtername);// Error, file not found
+    }
+    else{
+        fscanf(hFile, "%f", &auxf); 
+		*filterlength=(int)auxf;
+		while( (num = fscanf( hFile, "%f %c %fi\n", &real, &sign, &imag)) > 0 ) {
+			if( sign == '-' )imag *= -1;
+	    	filtercoeff[k] = real + imag*I;
+			printf("real=%3.6f, imag=%3.6f\n", __real__ filtercoeff[k], __imag__ filtercoeff[k]);
+			k++;
+		}
+     	if(k != *filterlength){
+			printf("\033[1m\033[31mWARNING!!!!. Please, verify the %s file. The filter length do not match the captured coefficients\033[0m\n", filtername);
+         	printf("\033[1m\033[31mfilterlength=%d, number of coeefs read=%d\033[0m\n", *filterlength, k);
+		}
+    }
+	printf("\033[1m\033[31mfilterlength=%d, number of coeefs read=%d\033[0m\n", *filterlength, k);
+    fclose(hFile);
+}
+*/
+/*
+int stream_conv_CPLX(_Complex float *ccinput, int datalength,_Complex float *filtercoeff, int filterlength, _Complex float *ccoutput){
+
+	int i, j;
+	static int first=0;
+	static _Complex float aux[FILTERLENGTH];
+
+	if(first==0){
+		for(j=0; j<filterlength; j++){
+			aux[j]=0.0+0.0i;
+			//printf("FIRST CCONV real=%3.6f, imag=%3.6f\n", __real__ filtercoeff[j], __imag__ filtercoeff[j]);
+		}
+		first=1;
+	}
+
+	for (i=0;i<datalength;i++) {
+		for (j=filterlength-2;j>=0;j--) {
+			aux[j+1]=aux[j];
+		}
+		aux[0]=ccinput[i];
+		ccoutput[i]=0.0;
+		for (j=0;j<filterlength;j++) {
+			ccoutput[i]+=aux[j]*filtercoeff[j];
+		}
+	}
+	return datalength;
+}
+*/
+

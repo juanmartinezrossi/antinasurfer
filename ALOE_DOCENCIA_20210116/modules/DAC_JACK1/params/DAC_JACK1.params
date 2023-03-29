@@ -1,0 +1,22 @@
+# INTEGER TYPE
+# p_opMODE: BYPASS	0, NORMAL	1
+parameter {
+	name = p_opMODE
+	value = 1
+}
+# INTEGER TYPE
+parameter {
+	name = p_num_operations
+	value = 1234
+}
+# FLOAT TYPE
+parameter {
+	name = p_constant
+	value = 3.66
+}
+# STRING TYPE
+parameter {
+	name = p_datatext
+	value = "MY_TEXT"
+}
+

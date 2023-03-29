@@ -1,0 +1,6 @@
+
+[000]:	Caution input interface control not connected
+
+[000]:	[info at file ../src/channel_noise.c, line 77]: Parameter block_length is 111
+
+[000]:	[info at file ../src/channel_noise.c, line 78]: Parameter block_length 

@@ -1,0 +1,52 @@
+# PLOT_MODE
+#	 	0x0: None;						
+#		0x1: Time;
+#		0x2: Spectrum;
+#		0x4: Constellation
+#		0x7: Alltogether
+
+parameter {
+	name = plot_mode
+	value = 1
+}
+
+parameter {
+	name = numsampl2view
+	value = 240
+}
+
+parameter {
+	name = samplingfreqHz
+	value = 1.0
+}
+
+parameter {
+	name = fftsize
+	value = 240
+}
+
+parameter {
+	name = numcaptures
+	value = 1
+}
+
+# AVERAGEDFFT: 0=Non Averaged; 1: Averaged
+
+parameter {
+	name = averagefft
+	value = 0
+}
+
+# Persistence of history in average
+parameter {
+	name = mu
+	value = 0.9
+}
+
+# LOGSCALE: dB Scale for FFT plotting: 0=Linear Scale; 1=dB Scale
+parameter {
+	name = logscale
+	value = 1
+}
+
+

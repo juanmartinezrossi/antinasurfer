@@ -1,0 +1,10 @@
+
+[000]:	Caution parameter shift not initated
+
+[000]:	Caution parameter nofFFT not initated
+
+[000]:	Caution parameter FFT_size not initated
+
+[001]:	Created FFT plan size 0 with 0 FFTs
+
+[001]:	ifft -> Received data does not match expected data (TS 1, received -1, expecting 0)

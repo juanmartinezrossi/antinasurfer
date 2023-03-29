@@ -1,0 +1,23 @@
+
+[000]:	Caution input interface control not connected
+
+[000]:	Caution output interface output_1 not connected
+
+[000]:	[info at file ../src/DATASOURCESINK_REPORTP21.c, line 118]: Parameter block_length is 360
+
+[000]:	[info at file ../src/DATASOURCESINK_REPORTP21.c, line 119]: Parameter block_length 
+
+[252]:	3 packets in interface input_1
+[352]:	3 packets in interface input_1
+[452]:	3 packets in interface input_1
+[551]:	3 packets in interface input_1
+[650]:	3 packets in interface input_1
+[749]:	3 packets in interface input_1
+[847]:	3 packets in interface input_1
+[945]:	3 packets in interface input_1
+[1043]:	3 packets in interface input_1
+[1141]:	3 packets in interface input_1
+[1239]:	3 packets in interface input_1
+[1337]:	3 packets in interface input_1
+[1435]:	3 packets in interface input_1
+[1533]:	3 packets in interface input_1

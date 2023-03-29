@@ -1,0 +1,43 @@
+
+#Param  opmode: 0: Impulse, 1: Frequency Scanning
+parameter {
+	name = opmode
+	value = 1
+}
+
+parameter {
+	name = block_length
+	value = 1000
+}
+
+parameter {
+	name = pulselength
+	value = 12
+}
+
+parameter {
+	name = gain
+	value = 0.1
+}
+
+parameter {
+	name = samplingfreqHz
+	value = 1.0
+}
+
+parameter {
+	name = threshold
+	value = 0.0005
+}
+
+parameter {
+	name = freq_step
+	value = 24.0
+}
+
+# 0: Phase, 1: Group delay
+parameter {
+	name = modephase
+	value = 1
+}
+

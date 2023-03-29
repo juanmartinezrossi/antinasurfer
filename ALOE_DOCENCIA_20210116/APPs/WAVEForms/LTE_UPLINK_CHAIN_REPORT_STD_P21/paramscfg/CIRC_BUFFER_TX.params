@@ -1,0 +1,18 @@
+# INTEGER TYPE
+# p_opMODE: BYPASS	1, NORMAL	2
+parameter {
+	name = opMODE
+	value = 2
+}
+# INTEGER TYPE
+parameter {
+	name = expectedinputlength
+	value = 14336
+}
+# FLOAT TYPE
+parameter {
+	name = outlength
+	value = 1024
+}
+
+

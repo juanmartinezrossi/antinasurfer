@@ -1,0 +1,223 @@
+/*
+ * hwapi_backd_signals.c
+ *
+ * Copyright (c) 2009 Ismael Gomez-Miguelez, UPC <ismael.gomez at tsc.upc.edu>
+ * All rights reserved.
+ *
+ *
+ * This file is part of ALOE.
+ *
+ * ALOE is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * ALOE is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with ALOE.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+
+/** System includes */
+#define _GNU_SOURCE
+#define _SVID_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <errno.h>
+#include <string.h>
+#include <sched.h>
+#include <time.h>
+#include <ctype.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/sem.h>
+#include <sys/msg.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/sem.h>
+#include <pthread.h>
+#include <sys/msg.h>
+
+/** HWAPI includes */
+#include "phal_hw_api.h"
+#include "hwapi_backd.h"
+
+/** Main HWAPI structure */
+extern struct hw_api_db *hw_api_db;
+
+/** Do not print messages on process death */
+extern int die_silent;
+
+extern int verbose;
+extern int trace;
+
+extern pthread_t runph_thread;
+extern pid_t runph_pid;
+
+extern int exit_level;
+
+void sig_chld(int sig, siginfo_t * sinfl, void *v);
+void sig_int(int sig, siginfo_t * sinfl, void *v);
+void sig_seg(int sig, siginfo_t * sinfl, void *v);
+
+int signals_setup() {
+	struct sigaction action;
+	sigset_t sigset;
+
+	printv("Setting up signals\n");
+
+	/*Capture SIGCHLD signals */
+	action.sa_sigaction = sig_chld;
+	action.sa_flags = SA_SIGINFO;
+	sigemptyset(&action.sa_mask);
+	if (sigaction(SIGCHLD, &action, NULL) < 0) {
+		perror("sigaction");
+		return 0;
+	}
+
+	/* capture SIGINT signal */
+	action.sa_sigaction = sig_int;
+	action.sa_flags = SA_SIGINFO;
+	sigemptyset(&action.sa_mask);
+	if (sigaction(SIGINT, &action, NULL) < 0) {
+		perror("sigaction");
+		return 0;
+	}
+
+	action.sa_sigaction = sig_seg;
+	sigaction(SIGSEGV, &action, NULL);
+
+	/** and SIGABORT */
+/*	sigaction(SIGBUS, &action, NULL);
+	sigaction(SIGILL, &action, NULL);
+	sigaction(SIGFPE, &action, NULL);
+	sigaction(SIGABRT, &action, NULL);
+*/
+
+	return 1;
+}
+
+/** Died child signal capture.
+ *
+ * This function can be improved using siginfo->pid instead of waitpid
+ */
+void sig_chld(int sig, siginfo_t * sinfl, void *v) {
+	int i, j;
+	time_t t;
+
+	struct net_db *net_db=&hw_api_db->net_db;
+
+	/** We don't know who is the child that died, so go through all databases
+	 * and find it.
+	 */
+
+	printva("SIGCHLD received from pid %d\n",sinfl->si_pid);
+
+	/* if it is the main network child, this is a fatal error, exit program */
+	if (net_db->net_chld > 0) {
+		if (waitpid(net_db->net_chld, NULL, WNOHANG) > 0) {
+			if (die_silent) {
+				printf(	"HWAPI_BACKD: Fatal error. Main network child died. Should exit...\n");
+			}
+			net_db->net_chld = 0;
+		}
+	}
+
+	/* if it is daemon, it is also a fatal error, exit program */
+	for (i = 0; i < MAX_DAEMONS; i++) {
+		if (hw_api_db->daemons[i].pid) {
+			if (waitpid(hw_api_db->daemons[i].pid, NULL, WNOHANG) > 0) {
+				if (die_silent) {
+					printf(	"\033[1;31m HWAPI_BACKD: Fatal error. Daemon %s died (pid %d). Should exit...\033[0m\n", hw_api_db->daemons[i].path,hw_api_db->daemons[i].pid);
+				}
+				hw_api_db->daemons[i].pid = 0;
+			}
+		}
+	}
+
+	/* if it is an object, set pid to 0. Here as we don't want to exit,
+	 * we will check all childs
+	 */
+	for (i = 0; i < MAX_PROCS; i++) {
+		if (hw_api_db->proc_db[i].pid) {
+			if (waitpid(hw_api_db->proc_db[i].pid, NULL, WNOHANG) > 0) {
+				get_time(&t);
+				if (die_silent && hw_api_db->proc_db[i].status.cur_status != 6
+						&& hw_api_db->proc_db[i].status.cur_status != 7
+						&& !hw_api_db->proc_db[i].rt_fault) {
+					printf("HWAPI_BACKD: Object %s (Id: 0x%x) died at %d:%d. TS=%d Status=%d\n",
+							hw_api_db->proc_db[i].obj_name,
+							hw_api_db->proc_db[i].obj_id, (int) t.tv_sec,
+							(int) t.tv_usec, hw_api_db->proc_db[i].cur_tstamp,
+							hw_api_db->proc_db[i].status.cur_status);
+				}
+				remove_file(i);
+				hw_api_db->proc_db[i].pid = 0;
+				remove_process(i);
+			}
+		}
+	}
+
+	/* finally, check all network childs */
+	for (i = 0; i < net_db->nof_ext_itf; i++) {
+		if (net_db->ext_itf[i].pid > 0) {
+			if (waitpid(net_db->ext_itf[i].pid, NULL, WNOHANG) > 0) {
+				if (verbose) {
+					printf("HWAPI_BACKD: Network child pid %d has died.\n",
+							net_db->ext_itf[i].pid);
+				}
+				net_db->ext_itf[i].pid = -1;
+				if (net_db->ext_itf[i].mode & FLOW_WRITE_ONLY) {
+					net_db->ext_itf[i].out_mbox_id = 0;
+				}
+			}
+		}
+		if (net_db->ext_itf[i].bpid > 0) {
+			if (waitpid(net_db->ext_itf[i].bpid, NULL, WNOHANG) > 0) {
+				if (verbose) {
+					printf("HWAPI_BACKD: Network bidirectional child pid %d has died.\n",
+							sinfl->si_pid);
+				}
+				net_db->ext_itf[i].bpid = 0;
+				net_db->ext_itf[i].out_mbox_id = 0;
+			}
+		}
+	}
+}
+
+void sig_seg(int sig, siginfo_t * sinfl, void *v) {
+	static int i=0;
+	if(i==10){
+		printf("SIGSEGV from pid %u\n",sinfl->si_pid);
+		i=1;
+	}
+	
+}
+/** Program Interrupt capture
+ *
+ */
+void sig_int(int sig, siginfo_t * sinfl, void *v) {
+
+	if (pthread_self()==runph_thread && getpid()==runph_pid) {
+		if (verbose) printf("SIGNAL %d detected by pid %d thread %d. Exiting...\n",sig,getpid(),pthread_self());
+		printv("\n-=- Exiting -=-\n\n");
+	}
+	exit(0);
+}
+
+

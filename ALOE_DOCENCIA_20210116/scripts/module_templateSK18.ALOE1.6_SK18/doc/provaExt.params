@@ -1,0 +1,47 @@
+
+
+# default input length for all interfaces, in number of samples.
+# value=0 receives all data
+parameter {
+	name = input_length
+	value = 0
+}
+
+
+
+
+
+################# PRINTING VARIABLES ####################
+#define NOPRINT        	0b0000=0 	/** Non printing choice*/
+#define DATARECEIVED   	0b0001=1 	/** Printing received data according specified type*/
+#define DATASENT		0b0010=2	/** Printing sent data out according specified type*/
+
+parameter {
+	name = print
+	value = 0
+}
+### Number of printed data columns format
+parameter {
+	name = printncolums
+	value = 32
+}
+### Initial Printing Time-slot 
+parameter {
+	name = TS2print
+	value = 0
+}
+### Number of printing Time-slots 
+parameter {
+	name = NumTS2print
+	value = 10
+}
+### Pointer offset to print 
+parameter {
+	name = offset
+	value = 0
+}
+### Maximum number of samples to print 
+parameter {
+	name = maxlen
+	value = 32
+}

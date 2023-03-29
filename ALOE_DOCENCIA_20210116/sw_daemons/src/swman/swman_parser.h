@@ -1,0 +1,51 @@
+/*
+ * swman_parser.h
+ *
+ * Copyright (c) 2009 Ismael Gomez-Miguelez, UPC <ismael.gomez at tsc.upc.edu>. All rights reserved.
+ *
+ *
+ * This file is part of ALOE.
+ *
+ * ALOE is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * ALOE is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with ALOE.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+/*AGBJuly15
+#define APPS_CFG_DIR "swman_apps"
+#define APPS_CFG_EXT "app"
+*/
+#define APPS_CFG_DIR ""
+#define APPS_CFG_EXT "app"
+
+#define EXECS_CFG_FILE "execs.cfg"
+
+
+
+#define OBJP_OBJNAME 		0
+#define OBJP_EXENAME		1
+#define NOF_OBJ_PARAM		2	
+
+
+#define ITFP_NAME	0
+#define ITFP_RITF	1
+#define ITFP_ROBJ	2
+#define NOF_ITF_PARAM	3
+
+
+
+int swman_parser_app (char *app_name, Set_o objects);
+
+int swman_parser_execs (Set_o execdb);
+
+

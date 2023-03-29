@@ -1,0 +1,46 @@
+parameter {
+	name = run_times
+	value = 1
+}
+
+parameter {
+	name = block_length
+	value = 4096
+}
+
+parameter {
+	name = signaltype
+	value = TONE_COMPLEX
+}
+
+parameter {
+	name = plot_modeIN
+	value = C1WLS
+}
+
+parameter {
+	name = plot_modeOUT
+	value = C2WLS
+}
+
+parameter {
+	name = samplingfreqHz
+	value = 48000.0
+}
+
+parameter {
+	name = gain
+	value = 0.35
+}
+
+parameter {
+	name = reffreq
+	value = 100.0
+}
+
+parameter {
+	name = tonefreq
+	value = 1000.0
+}
+
+

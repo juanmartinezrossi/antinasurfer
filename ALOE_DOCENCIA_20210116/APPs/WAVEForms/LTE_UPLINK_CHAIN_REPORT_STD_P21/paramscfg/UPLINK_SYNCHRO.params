@@ -1,0 +1,67 @@
+#------------------------------------------------------------------
+#opMODE Options: 0-DMRS_ONLY, NO_SRS, 1: SRS_ALSO
+parameter {
+	name = opMODE
+	value = 0
+}
+#------------------------------------------------------------------
+# Multiflow
+# 0-Decimation not done in DDC. Select the most suitable flow decimating according DUC
+# 1-Decimation done in DDC. Only one flow.
+parameter {
+	name = Multiflow
+	value = 1
+}
+###################################################################
+## 
+## // Go to http://niviuk.free.fr/lte_srs.php for details. (visited 9-18-19)
+##
+# cellBwMHz Options: 1.4, 3.0, 5.0, 10.0, 15.0, 20.0 MHz
+parameter {
+	name = cellBwMHz
+	value = 3.0
+}
+#------------------------------------------------------------------
+# Csrs: SRS Bandwidth config. Options: 0, 1, 2, 3, 4, 5, 6, 7
+parameter {
+	name = Csrs
+	value = 0
+}
+#------------------------------------------------------------------
+# SubConfsrs: SRS subframe config. Options: 0-15
+parameter {
+	name = SubConfsrs
+	value = 9
+}
+#------------------------------------------------------------------
+# Bsrs: SRS bandwidth. Options: 0-3
+parameter {
+	name = Bsrs
+	value = 0
+}
+#------------------------------------------------------------------
+# nRRC: Frequency domain position. Options: 1-23
+parameter {
+	name = nRRC
+	value = 0
+}
+#------------------------------------------------------------------
+# Isrs: SRS configuration index. Options: 
+parameter {
+	name = Isrs
+	value = 0
+}
+#------------------------------------------------------------------
+# kTC: comb. Options: 0, 1 
+parameter {
+	name = kTC
+	value = 0
+}
+#------------------------------------------------------------------
+# RBsAssigned: 1-Indicates the RB assigned
+# 			   The selected format requires to start with RBs:list of RBs separeated by comma.
+parameter {
+	name = RBsAssigned
+	value = RBs:0,1,2,3
+}
+

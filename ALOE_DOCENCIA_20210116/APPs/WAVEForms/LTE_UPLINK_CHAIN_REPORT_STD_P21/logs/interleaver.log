@@ -1,0 +1,11 @@
+
+[000]:	Caution parameter mode not initated
+
+[000]:	Caution parameter blockSize not initated
+
+[000]:	Caution parameter cuttailbits not initated
+
+[000]:	Caution parameter numBlocks not initated
+
+[003]:	interleaver -> InputLength is zero (TS 2)
+[004]:	interleaver -> InputLength is zero (TS 3)

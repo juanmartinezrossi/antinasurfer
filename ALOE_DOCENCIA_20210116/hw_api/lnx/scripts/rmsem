@@ -1,0 +1,15 @@
+#!/usr/bin/perl
+
+$username = shift(@ARGV);
+@output = `ipcs -s | grep $username | cut -c12-22`;
+foreach (@output)
+{
+     chop;
+     print `ipcrm -s $_`;
+}
+@output = `ipcs -q | grep $username | cut -c12-22`;
+foreach (@output)
+{
+     chop;
+     print `ipcrm -q $_`;
+}

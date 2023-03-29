@@ -1,0 +1,81 @@
+
+executable {
+	name=gen_binsource
+	binary {
+		platform=linux
+	}
+	binary {
+		platform=c6000
+		memory=0x200000
+	}
+}
+
+
+executable {
+	name=gen_digitalmodem
+	binary {
+		platform=linux
+	}
+	binary {
+		platform=c6000
+		memory=0x200000
+	}
+}
+
+
+executable {
+	name=gen_sink
+	binary {
+		platform=linux
+	}
+	binary {
+		platform=c6000
+		memory=0x200000
+	}
+}
+
+
+executable {
+	name=gen_interleaver
+	binary {
+		platform=linux
+	}
+	binary {
+		platform=c6000
+		memory=0x700000
+	}
+}
+
+
+executable {
+	name=utran_turbocoder
+	binary {
+		platform=linux
+	}
+	binary {
+		platform=c6000
+		memory=0x200000
+	}
+}
+executable {
+	name=utran_turbodecoder
+	binary {
+		platform=linux
+	}
+	binary {
+		platform=c6000
+		memory=0x200000
+	}
+}
+
+executable {
+	name=gen_channel_gauss
+	binary {
+		platform=linux
+	}
+	binary {
+		platform=c6000
+		memory=0x400000
+	}
+}
+

@@ -1,0 +1,407 @@
+/* 
+ * Copyright (c) 2012.
+ * This file is part of ALOE (http://flexnets.upc.edu/)
+ * 
+ * ALOE++ is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * ALOE++ is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with ALOE++.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include <phal_sw_api.h>
+#include <swapi_utils.h>
+#include <assert.h>
+#include <stdio.h>
+
+#include "print_utils.h"
+#include "paramsSK15.h"
+#include "skeletonSK15.h"
+
+#define MAX_STATS 		50
+#define MAX_INPUTS 		20
+#define MAX_OUTPUTS 	20
+
+extern const int input_max_samples;
+extern const int output_max_samples;
+extern const int input_sample_sz;
+extern const int output_sample_sz;
+extern const int nof_input_itf;
+extern const int nof_output_itf;
+
+
+/*User Params*/
+extern const int nof_extra_vars;
+extern const int nof_parameters;
+param_t parameters[MAX_PARAMS];
+/*extern param_t parameters[];*/
+
+struct utils_variables vars_extra[MAX_STATS]= {
+		{"A", 0, 0, 0, 0},
+		{"B", 0, 0, 0, 0},
+		{"C", 0, 0, 0, 0},
+		{"A", 0, 0, 0, 0},
+		{"B", 0, 0, 0, 0},
+		{"C", 0, 0, 0, 0},
+		{"A", 0, 0, 0, 0},
+		{"B", 0, 0, 0, 0},
+		{"C", 0, 0, 0, 0},
+		{"A", 0, 0, 0, 0},
+		{"B", 0, 0, 0, 0},
+		{"C", 0, 0, 0, 0},
+		{NULL, 0, 0, 0, 0}};
+
+struct utils_itf input_itfs[MAX_INPUTS], output_itfs[MAX_OUTPUTS];
+struct utils_param params =  {NULL, 0, 0, 0};
+struct utils_stat stats[MAX_STATS];
+int stat_ids[MAX_STATS];
+char input_itf_str[MAX_INPUTS][64], output_itf_str[MAX_OUTPUTS][64];
+
+char ctrl_itf_name[] = "control";
+
+char *input_buffer;
+char *output_buffer;
+int input_nsamples[MAX_INPUTS];
+int output_nsamples[MAX_INPUTS];
+
+extern int currentInterfaceIdx;
+
+#define addStat(a,b,c,d,e) \
+		stats[statcnt].name = a; \
+		stats[statcnt].type = b; \
+		stats[statcnt].size = c; \
+		stats[statcnt].id = &stat_ids[statcnt]; \
+		stats[statcnt].value = d; \
+		stats[statcnt].update_mode = e; \
+		statcnt++;
+
+#define endStats stats[statcnt].name=NULL;
+
+int process_control(int len);
+int rcv_input(int len);
+
+void allocate_memory() {
+	/**@TODO: use static memory allocator */
+	input_buffer = malloc(nof_input_itf*input_max_samples*input_sample_sz);
+	assert(input_buffer);
+	output_buffer = malloc(nof_output_itf*output_max_samples*output_sample_sz);
+	assert(output_buffer);
+}
+
+void free_memory() {
+	free(input_buffer);
+	free(output_buffer);
+}
+
+void ConfigInterfaces() {
+	int i;
+	int j=0;
+	int statcnt=0;
+	param_t *param;
+	char itf_str[64];
+	int tmp;
+
+/*	printf("\nskeletonSK15:CongigureInterfaces():input_max_samples=%d\n", input_max_samples);
+	printf("nof_extra_vars=%d\n", nof_extra_vars);
+	printf("nof_parameters=%d\n", nof_parameters);*/
+/*	printf("input_max_samples=%d\n", input_max_samples);
+	printf("output_max_samples=%d\n", output_max_samples);
+	printf("input_sample_sz=%d\n", input_sample_sz);
+	printf("output_sample_sz=%d\n", output_sample_sz);
+	printf("nof_input_itf=%d\n", nof_input_itf);
+	printf("nof_output_itf=%d\n", nof_output_itf);*/
+
+
+	allocate_memory();
+
+	if (param_init(parameters,nof_parameters) == -1) {
+		printf("Error configuring module_parameters.h\n");
+		return;
+	}
+
+	if (nof_parameters+nof_extra_vars+1 > MAX_STATS) {
+		printf("Error too many parameters and variables.\nIncrease MAX_STATS in skeletonSK15.c\n");
+		return;
+	}
+
+	if (nof_input_itf > MAX_INPUTS) {
+		printf("Error too many input interfaces.\nIncrease MAX_INPUTS in skeletonSK15.c\n");
+		return;
+	}
+
+	if (nof_output_itf > MAX_OUTPUTS) {
+		printf("Error too many input interfaces.\nIncrease MAX_INPUTS in skeletonSK15.c\n");
+		return;
+	}
+
+	if (!InitParamFile()) {
+		printf(RESET BOLD "WARNING!!! initiating parameters from %s.params file "RESET"\n", GetObjectName());
+	}
+
+	/* configure control interface */
+	input_itfs[0].name = ctrl_itf_name;
+	input_itfs[0].sample_sz = param_packet_size();
+	input_itfs[0].max_buffer_len = 1;
+	input_itfs[0].buffer = param_packet_addr();
+	input_itfs[0].process_fnc = process_control;
+	input_itfs[0].get_block_sz = NULL;
+
+	/** configure inputs */
+	for (i = 1; i < nof_input_itf+1; i++) {
+		snprintf(input_itf_str[i-1], 64, "input_%d", i-1);
+		input_itfs[i].name = input_itf_str[i-1];
+		input_itfs[i].sample_sz = input_sample_sz;
+		input_itfs[i].max_buffer_len = input_max_samples;
+		input_itfs[i].buffer = &input_buffer[(i-1)*input_max_samples*input_sample_sz];	/*MODIFIED 11/03/2015*/
+/*		printf("skeletonSK15(): bufferIN[%d]=%ul\n", i, input_itfs[i].buffer);*/
+		input_itfs[i].process_fnc = rcv_input;
+		input_itfs[i].get_block_sz = NULL;
+	}
+	input_itfs[i].name = NULL;
+
+
+	/** configure outputs */
+	for (i = 0; i < nof_output_itf; i++) {
+		snprintf(output_itf_str[i], 64, "output_%d", i);
+		output_itfs[i].name = output_itf_str[i];
+		output_itfs[i].sample_sz = output_sample_sz;
+		output_itfs[i].max_buffer_len = output_max_samples;
+		output_itfs[i].buffer = &output_buffer[i*output_max_samples*output_sample_sz];	/*MODIFIED 11/03/2015*/
+/*		printf("skeletonSK15(): bufferOUT[%d]=%ul\n", i, output_itfs[i].buffer);*/
+		output_itfs[i].process_fnc = NULL;
+		output_itfs[i].get_block_sz = NULL;
+	}
+	output_itfs[i].name = NULL;
+
+	for (i = 0; i < param_nof() && i<nof_parameters; i++) {
+		param = param_get_i(i);
+		assert(param);
+
+		/** get param */
+		if (!GetParam(param->name, param_get_addr_i(i),
+				param_get_aloe_type_i(i),param->size)) {
+			/*printf("Caution parameter %s not initated\n", param->name);*/
+			printf("\033[1m\033[31mCaution parameter %s not initiated for %s\033[0m\n", param->name, GetObjectName());
+		}
+
+		/* copy stats structure, will be initialized by the skeleton */
+		addStat(param->name, param_get_aloe_type_i(i),
+				param->size, param_get_addr_i(i), READ);
+	}
+
+	/* copy extra variables */
+/*	printf("ConfigInterfaces():nof_extra_vars=%d\n", nof_extra_vars);*/
+	for (i=0;vars_extra[i].name && i<nof_extra_vars;i++) {
+		if (vars_extra[i].value) {
+			addStat(vars_extra[i].name,vars_extra[i].type,vars_extra[i].size,
+					vars_extra[i].value,vars_extra[i].update_mode);
+		} else {
+			tmp=0;
+			/* if value is NULL, try if it is an interface */
+			for (j=0;j<nof_input_itf;j++) {
+				if (!strcmp(input_itf_str[j],vars_extra[i].name)) {
+					addStat(vars_extra[i].name,vars_extra[i].type,vars_extra[i].size,
+						&input_buffer[j*input_max_samples],vars_extra[i].update_mode);
+					break;
+				}
+			}
+			if (j==nof_input_itf) {
+				tmp=1;
+			}
+			for (j=0;j<nof_output_itf;j++) {
+				if (!strcmp(output_itf_str[j],vars_extra[i].name)) {
+					addStat(vars_extra[i].name,vars_extra[i].type,vars_extra[i].size,
+						&output_buffer[j*output_max_samples],vars_extra[i].update_mode);
+					break;
+				}
+			}
+			if (!tmp && j==nof_output_itf) {
+				printf("Caution could not find interface %s for extra variable\n",
+						vars_extra[i].name);
+			}
+		}
+	}
+
+	endStats;
+
+}
+
+/** Called after data is received, we save the number of bytes that have been received.
+ */
+int rcv_input(int len) {
+	assert(currentInterfaceIdx>0 && currentInterfaceIdx<nof_input_itf+1);
+	input_nsamples[currentInterfaceIdx-1] = len;
+	return 1;
+}
+
+/** Returns the number of samples at input interface idx
+ */
+int get_input_samples(int idx) {
+	assert(idx>=0 && idx<nof_input_itf);
+	return input_nsamples[idx];
+}
+
+int get_input_max_samples() {
+	return input_max_samples;
+}
+
+/** Sends nsamples through output interface idx
+ * By default, the number of samples to send is the value returned by the work() function
+ */
+void set_output_samples(int idx, int nsamples) {
+	assert(idx>=0 && idx<nof_output_itf);
+	output_nsamples[idx] = nsamples;
+}
+
+void check_output_samples(char *modname, int idx){
+	assert(idx>=0 && idx<nof_output_itf);
+	printf("%s: number of samples at output_%d = %d\n", modname, idx, output_nsamples[idx]);
+}
+
+void check_input_samples(char *modname, int idx){
+	assert(idx>=0 && idx<nof_input_itf);
+	printf("%s: number of samples at input_%d = %d\n", modname, idx, input_nsamples[idx]);
+}
+
+
+/** RunCustom() function process the received data by calling the user processing function.
+ *  return 1 if ok, 0 if error.
+ */
+int RunCustom() {
+	int n, i;
+
+	n = work(input_buffer, output_buffer);
+	if (n == -1) {
+		return 0;
+	}
+
+/*	printf("MODIFICAT\n");*/
+
+	/** set output length to a default value */
+	for (i = 0; i < nof_output_itf; i++) {
+		if (!output_nsamples[i]) {
+			output_nsamples[i] = 0;
+		}
+/*		printf("length output[%d]=%d\n", i, output_nsamples[i]);*/
+	}
+
+	/* send output data */
+	for (i = 0; i < nof_output_itf; i++) {
+		SendItf(i, output_nsamples[i]);
+	}
+
+	/* reset len counters */
+	memset(output_nsamples, 0, sizeof(int) * nof_output_itf);
+	memset(input_nsamples, 0, sizeof(int) * nof_input_itf);
+
+	return 1;
+}
+
+/** function called by background skeleton after all the initialization process.
+ * Here we call User init function to initialize object-specific variables.
+ */
+int InitCustom() {
+	if (initialize()) {
+		return -1;
+	}
+	return 1;
+}
+
+int StopCustom() {
+	stop();
+	free_memory();
+	return 1;
+}
+
+int process_control(int len) {
+	param_packet_read(len);
+	return initialize();
+}
+
+
+/*STATS/////////////////////////////////////////////////////////*/
+/*struct utils_variables {
+	char *name;
+	int type;
+	int size;
+	void *value;
+	enum stat_update update_mode;
+};*/
+
+
+
+int stat_create(char *StatName, int StatType, int StatLength, int *StatValue, param_type_t StatMode){
+	int *stat=NULL;
+	int StatIdx=0, i=0;
+	char aux_string[256];
+
+	/*Check if StatName defined*/
+	sprintf(aux_string, "%s:%s:%s", GetAppName(), GetObjectName(), StatName);
+	if(GetPublicStatID(GetAppName(), GetObjectName(), StatName) == 0){
+		StatIdx=CreateLocalPublicStat(StatName, StatType, StatLength);
+		while(vars_extra[i].name != NULL && vars_extra[i].name !=StatName){
+			i++;
+		}
+/*		if(vars_extra[i].name == NULL)nof_extra_vars++;*/
+/*		printf("stat_create_int(): i=%d\n", i);*/
+		vars_extra[i].name=aux_string;
+		vars_extra[i].type=StatType;
+		vars_extra[i].size=StatLength;
+		vars_extra[i].value=StatValue;
+		vars_extra[i].update_mode=StatMode;
+		vars_extra[i+1].name=NULL;
+	}else{
+		printf("stat_create_int(): StatName '%s' already defined\n", aux_string);
+	}
+	return StatIdx;
+}
+
+int stat_get_idx(char *ObjectName, char *StatName){
+
+	int StatIDX=0;
+	char aux_string[256];
+
+	StatIDX=GetPublicStatID(GetAppName(), ObjectName, StatName);
+	sprintf(aux_string, "%s:%s:%s", GetAppName(), ObjectName, StatName);
+	if(StatIDX==0){
+		printf("WARNING!!!:Stat Name %s Not found\n", aux_string);
+	}
+	if(StatIDX > 0){
+		printf("Stat Name '%s' found with StatIDX=%d\n", aux_string, StatIDX);
+	}
+	return(StatIDX);
+}
+
+
+int stat_set(int StatIdx, void *StatValue, int StatLength){
+	int aux=0;
+	if(StatIdx==0){
+		printf("stat_get(): WARNING!!!: Non valid StatIdx=%d \n", StatIdx);
+		return(0);
+	}
+	aux=SetPublicStatsValue(StatIdx, StatValue, StatLength);
+	if(aux != StatLength)printf("stat_set(): WARNING!!!: Data length read (%d) differs from demanded one (%d)\n", aux, StatLength);
+	return(aux);
+}
+
+int stat_get(int StatIdx, int *StatValue, int StatLength){
+	int aux=0;
+	if(StatIdx==0){
+		printf("stat_get(): WARNING!!!: Non valid StatIdx=%d \n", StatIdx);
+		return(0);
+	}
+	aux=GetPublicStatsValue(StatIdx, StatValue, StatLength);
+	if(aux != StatLength)printf("stat_get(): WARNING!!!: Data length written (%d) differs from demanded one (%d)\n", aux, StatLength);
+	return(aux);
+}
+
+
+
+

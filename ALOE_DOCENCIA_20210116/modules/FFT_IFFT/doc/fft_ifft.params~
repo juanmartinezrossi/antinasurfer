@@ -1,0 +1,22 @@
+
+parameter {
+	name = samplingfreqHz
+	value = 48000.0
+}
+
+parameter {
+	name = fftsize
+	value = 128
+}
+# Number of FFT/IFFTs. The number of received data should match with 128*numffts
+parameter {
+	name = numffts
+	value = 1
+}
+# Operation Mode: 0: FFT; 1: IFFT
+parameter {
+	name = op_mode
+	value = 0	
+}
+
+

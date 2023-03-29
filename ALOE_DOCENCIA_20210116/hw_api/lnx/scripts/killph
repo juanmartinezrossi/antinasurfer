@@ -1,0 +1,60 @@
+#!/bin/bash
+
+TMPDIR="/tmp"
+LOCKEXT="lock"
+PROGRAM="runph"
+
+if [ $# -eq 1 ];
+then
+OPT="-f"
+if [ $1 = $OPT ];
+then
+	killall runph
+	killall cmdman
+	killall swman
+	killall hwman
+	killall statsman
+	killall sync_master
+	killall sync
+	killall stats
+	killall swload
+	killall exec
+	killall bridge
+	killall frontend
+	exit
+fi
+fi
+
+if [ ! "$(ls $TMPDIR/*.$LOCKEXT 2>/dev/null)" ] 
+then
+	echo "Any PHAL is running"
+	exit
+fi
+
+for i in "$TMPDIR"/*.$LOCKEXT
+do
+	PID="$(cat $i)"
+	if [ -f $i ] 
+	then
+		echo "Sending SIGINT to $PID"
+		kill -s INT $PID
+		sleep 0.5
+		if [ -f $i ]
+		then
+			echo "Still alive. Waiting..."
+			sleep 1
+			if [ -f $i ]
+			then
+				echo "Sending killall..."		
+				killall -s INT $PROGRAM
+			fi
+		fi
+		if [ -f $i ]
+		then
+			echo "PHAL with pid $PID might be still alive."
+		else
+			echo "PHAL with pid $PID finished."
+		fi
+	fi			
+done
+

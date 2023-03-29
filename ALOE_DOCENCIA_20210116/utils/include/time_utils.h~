@@ -1,0 +1,11 @@
+#ifndef TIME_UTILS_H_
+#define TIME_UTILS_H_
+
+
+#include <time.h>
+/*typedef struct timespec time_t;*/
+
+int get_time_r(time_t *x);
+void get_time_interval_r(time_t *tdata);
+
+#endif /*TIME_UTILS_H_*/

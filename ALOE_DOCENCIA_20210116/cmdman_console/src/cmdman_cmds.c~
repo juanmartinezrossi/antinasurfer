@@ -1,0 +1,734 @@
+/*
+ * cmdman_cmds.c
+ *
+ * Copyright (c) 2009 Ismael Gomez-Miguelez, UPC <ismael.gomez at tsc.upc.edu>. All rights reserved.
+ *
+ * This file is part of ALOE.
+ *
+ * ALOE is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * ALOE is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with ALOE.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+#include "params.h"
+
+#include "phal_hw_api.h"
+#include "stats.h"
+#include "set.h"
+#include "strdata.h"
+#include "cmdman_backend.h"
+#include "cmdman_cmds.h"
+#include "phal_daemons.h"
+#include "cmdman_prints.h"
+
+
+
+#include "str.h"
+#include "set.h"
+#include "cfg_parser.h"
+
+#define MAX_ARGS 20
+char *argv[MAX_ARGS];
+
+#define MAX_DATA 128*1024
+char data[MAX_DATA];
+
+#define MAX_PROCS	50
+struct proc_info procs[MAX_PROCS];
+
+#define MAX_APPS	10
+struct app_info apps[MAX_APPS];
+
+#define MAX_STATS	500
+struct stat_info stats[MAX_STATS];
+
+#define MAX_PE	10
+struct pe_info peinfo[MAX_PE];
+
+
+int _execlog(char *x, int answer, strdata_o strdata, char do_print) {
+	int n;
+	int argc;
+
+	if (answer == PARAM_EXEC) {
+		argc = string_to_argv(x, argv, MAX_ARGS);
+		if (argc<2) {
+			return ERROR_PARAMS;
+		}
+
+		if (!strcmp(argv[1],"start")) {
+			n = cmdman_execlogs(argv[0], 1, 50);
+		} else if (!strcmp(argv[1],"stop")) {
+			n = cmdman_execlogs(argv[0], 0, 50);
+		} else {
+			if (do_print) {
+				printf("CMDMAN: Error in command. Action must be start or stop\n");
+			}
+			return ERROR_PARAMS;
+		}
+		
+	} else {
+		n = answer;
+	}
+
+	if (do_print) {
+		if (n >= 0) {
+			printf("\nCMDMAN: Logs action ok..\n\n");
+		} else {
+			printf("\nCMDMAN: Could not perform action.\n\n");
+		}
+	}
+
+	return n;
+}
+
+int _execreport(char *x, int answer, strdata_o strdata, char do_print) {
+	int n;
+	int argc;
+
+	if (answer == PARAM_EXEC) {
+		argc = string_to_argv(x, argv, MAX_ARGS);
+		if (argc<2) {
+			return ERROR_PARAMS;
+		}
+
+		if (!strcmp(argv[1],"start")) {
+			n = cmdman_execreports(argv[0], 1, 50);
+		} else if (!strcmp(argv[1],"stop")) {
+			n = cmdman_execreports(argv[0], 0, 50);
+		} else {
+			if (do_print) {
+				printf("CMDMAN: Error in command. Action must be start or stop\n");
+			}
+			return ERROR_PARAMS;
+		}
+	} else {
+		n = answer;
+	}
+
+	if (do_print) {
+		if (n >= 0) {
+			printf("\nCMDMAN: Reports set ok.\n\n");
+		} else {
+			printf("\nCMDMAN: Error setting reports\n\n");
+		}
+	}
+
+	return n;
+}
+
+int _statlist(char *x, int answer, strdata_o strdata, char do_print) {
+	int n;
+	int i;
+	int argc;
+
+	if (answer == PARAM_EXEC) {
+		argc = string_to_argv(x, argv, MAX_ARGS);
+		if (argc<1) {
+			return ERROR_PARAMS;
+		}
+		
+		n = cmdman_statlist(argv[0], argc>1?argv[1]:NULL, stats, MAX_STATS, 30);
+
+		
+		if (strdata) {
+			for(i=0;i<n;i++) { 	
+				strdata_push(strdata, stats[i].objname, PARAM_STRING);
+				strdata_push(strdata, stats[i].statname, PARAM_STRING);
+				strdata_push(strdata, &stats[i].type, PARAM_INT);
+				strdata_push(strdata, &stats[i].size, PARAM_INT);
+			}
+		}
+	} else {
+		n = answer;
+		assert (strdata);
+		for (i=0;i<n;i++) {
+			strdata_pop(strdata, stats[i].objname, PARAM_STRING);
+			strdata_pop(strdata, stats[i].statname, PARAM_STRING);
+			strdata_pop(strdata, &stats[i].type, PARAM_INT);
+			strdata_pop(strdata, &stats[i].size, PARAM_INT);
+		}
+	}
+
+	if (do_print) {
+		if (n>0) {
+			stats_print(1, stats, n);
+		} else if (!n) {
+			printf("CMDMAN: Any stat available\n");
+		} else {
+			printf("CMDMAN: Error while listing stats (%d)\n", n);
+		}
+	}
+	
+	return n;
+}
+
+int _applist(char *x, int answer, strdata_o strdata, char do_print) {
+	int n;
+	int i;
+
+	if (answer == PARAM_EXEC) {
+		n = cmdman_applist(apps, MAX_APPS, 50);
+		if (strdata) {
+			for(i=0;i<n;i++) { 	
+				strdata_push(strdata, apps[i].name, PARAM_STRING);
+				strdata_push(strdata, &apps[i].app_id, PARAM_INT);
+				strdata_push(strdata, &apps[i].status, PARAM_INT);
+                                strdata_push(strdata, &apps[i].nof_rtfaults, PARAM_INT);
+			}
+		}
+	} else {
+		n = answer;
+		assert (strdata);
+		for (i=0;i<n;i++) {
+			strdata_pop(strdata, apps[i].name, PARAM_STRING);
+			strdata_pop(strdata, &apps[i].app_id, PARAM_INT);
+			strdata_pop(strdata, &apps[i].status, PARAM_INT);
+                        strdata_pop(strdata, &apps[i].nof_rtfaults, PARAM_INT);
+		}
+	}
+
+	if (do_print) {
+		if (n>0) {
+			apps_print(1, apps, n);
+		} else if (!n) {
+			printf("CMDMAN: Any app available\n");
+		} else {
+			printf("CMDMAN: Error while listing apps (%d)\n", n);
+		}
+	}
+	
+	return n;
+}
+
+int _pelist(char *x, int answer, strdata_o strdata, char do_print) {
+	int n;
+	int i,j;
+
+	if (answer == PARAM_EXEC) {
+		n = cmdman_pelist(peinfo, MAX_PE, 50);
+		if (strdata) {
+			for(i=0;i<n;i++) {
+                            
+				strdata_push(strdata, peinfo[i].name, PARAM_STRING);
+				strdata_push(strdata, &peinfo[i].id, PARAM_INT);
+				strdata_push(strdata, &peinfo[i].plat_family, PARAM_INT);
+				strdata_push(strdata, &peinfo[i].nof_cores, PARAM_INT);
+				strdata_push(strdata, &peinfo[i].C, PARAM_FLOAT);
+				strdata_push(strdata, &peinfo[i].intBW, PARAM_FLOAT);
+				strdata_push(strdata, &peinfo[i].totalC, PARAM_FLOAT);
+				strdata_push(strdata, &peinfo[i].totalintBW, PARAM_FLOAT);
+				strdata_push(strdata, &peinfo[i].nof_xitf, PARAM_INT);
+				strdata_push(strdata, &peinfo[i].core_id, PARAM_INT);
+				for (j=0;j<peinfo[i].nof_xitf;j++) {
+					strdata_push(strdata, &peinfo[i].xitf[j].remote_id, PARAM_UCHAR);
+					strdata_push(strdata, &peinfo[i].xitf[j].remote_pe, PARAM_USHORT);
+					strdata_push(strdata, &peinfo[i].xitf[j].xitf.id, PARAM_UCHAR);
+					strdata_push(strdata, &peinfo[i].xitf[j].xitf.mode, PARAM_CHAR);
+					strdata_push(strdata, &peinfo[i].xitf[j].xitf.delay, PARAM_SHORT);
+					strdata_push(strdata, &peinfo[i].xitf[j].xitf.BW, PARAM_FLOAT);
+					strdata_push(strdata, &peinfo[i].xitf[j].totalBW, PARAM_FLOAT);
+				}
+			}
+		}
+	} else {
+        n = answer;
+		assert (strdata);
+		for (i=0;i<n;i++) {
+			strdata_pop(strdata, peinfo[i].name, PARAM_STRING);
+			strdata_pop(strdata, &peinfo[i].id, PARAM_INT);
+			strdata_pop(strdata, &peinfo[i].plat_family, PARAM_INT);
+			strdata_pop(strdata, &peinfo[i].nof_cores, PARAM_INT);
+			strdata_pop(strdata, &peinfo[i].C, PARAM_FLOAT);
+			strdata_pop(strdata, &peinfo[i].intBW, PARAM_FLOAT);
+			strdata_pop(strdata, &peinfo[i].totalC, PARAM_FLOAT);
+			strdata_pop(strdata, &peinfo[i].totalintBW, PARAM_FLOAT);
+			strdata_pop(strdata, &peinfo[i].nof_xitf, PARAM_INT);
+			strdata_pop(strdata, &peinfo[i].core_id, PARAM_INT);
+			for (j=0;j<peinfo[i].nof_xitf;j++) {
+				strdata_pop(strdata, &peinfo[i].xitf[j].remote_id, PARAM_UCHAR);
+				strdata_pop(strdata, &peinfo[i].xitf[j].remote_pe, PARAM_USHORT);
+				strdata_pop(strdata, &peinfo[i].xitf[j].xitf.id, PARAM_UCHAR);
+				strdata_pop(strdata, &peinfo[i].xitf[j].xitf.mode, PARAM_CHAR);
+				strdata_pop(strdata, &peinfo[i].xitf[j].xitf.delay, PARAM_SHORT);
+				strdata_pop(strdata, &peinfo[i].xitf[j].xitf.BW, PARAM_FLOAT);
+				strdata_pop(strdata, &peinfo[i].xitf[j].totalBW, PARAM_FLOAT);
+			}
+		}
+	}
+
+	if (do_print) {
+		if (n>0) {
+			pe_print(1, peinfo, n);
+		} else if (!n) {
+			printf("CMDMAN: Any PE available\n");
+		} else {
+			printf("CMDMAN: Error while listing PE (%d)\n", n);
+		}
+	}
+	
+	return n;
+}
+
+int _execinfo(char *x, int answer, strdata_o strdata, char do_print) {
+	int n;
+	int i,j;
+	int argc;
+
+	if (answer == PARAM_EXEC) {
+		argc = string_to_argv(x,argv,MAX_ARGS);
+		if (argc<1) {
+			return ERROR_PARAMS;
+		}
+		n = cmdman_appinfo(argv[0],argc>1?argv[1]:NULL, procs, MAX_PROCS, 50);
+		if (strdata) {
+			for(i=0;i<n;i++) { 	
+				strdata_push(strdata, procs[i].name, PARAM_STRING);
+				strdata_push(strdata, &procs[i].obj_id, PARAM_INT);
+				strdata_push(strdata, &procs[i].status, PARAM_INT);
+				strdata_push(strdata, &procs[i].tstamp, PARAM_INT);
+				strdata_push(strdata, &procs[i].period, PARAM_INT);
+				strdata_push(strdata, &procs[i].nvcs, PARAM_INT);
+				strdata_push(strdata, &procs[i].end_usec, PARAM_INT);
+				strdata_push(strdata, &procs[i].cpu_usec, PARAM_INT);
+				strdata_push(strdata, &procs[i].max_usec, PARAM_INT);
+				strdata_push(strdata, &procs[i].max_end_usec, PARAM_INT);
+				strdata_push(strdata, &procs[i].mean_mops, PARAM_FLOAT);
+                strdata_push(strdata, &procs[i].max_mops, PARAM_FLOAT);
+				strdata_push(strdata, &procs[i].pe_id, PARAM_INT);
+				strdata_push(strdata, &procs[i].core_id, PARAM_INT);
+				strdata_push(strdata, &procs[i].nof_faults, PARAM_INT);
+				strdata_push(strdata, &procs[i].C, PARAM_FLOAT);
+				strdata_push(strdata, &procs[i].nof_itf, PARAM_INT);
+				for (j=0;j<procs[i].nof_itf;j++) {
+					strdata_push(strdata, procs[i].itf[j].name, PARAM_STRING);
+					strdata_push(strdata, &procs[i].itf[j].mode, PARAM_INT);
+					strdata_push(strdata, procs[i].itf[j].remote_name, PARAM_STRING);
+					strdata_push(strdata, procs[i].itf[j].remote_obj_name, PARAM_STRING);
+					strdata_push(strdata, &procs[i].itf[j].xitf_id, PARAM_INT);
+					strdata_push(strdata, &procs[i].itf[j].fifo_usage, PARAM_INT);
+					strdata_push(strdata, &procs[i].itf[j].bpts, PARAM_INT);
+				}
+
+			}
+		}
+	} else {
+		n = answer;
+		assert (strdata);
+		for (i=0;i<n;i++) {
+			strdata_pop(strdata, procs[i].name, PARAM_STRING);
+			strdata_pop(strdata, &procs[i].obj_id, PARAM_INT);
+			strdata_pop(strdata, &procs[i].status, PARAM_INT);
+			strdata_pop(strdata, &procs[i].tstamp, PARAM_INT);
+			strdata_pop(strdata, &procs[i].period, PARAM_INT);
+			strdata_pop(strdata, &procs[i].nvcs, PARAM_INT);
+			strdata_pop(strdata, &procs[i].end_usec, PARAM_INT);
+			strdata_pop(strdata, &procs[i].cpu_usec, PARAM_INT);
+			strdata_pop(strdata, &procs[i].max_usec, PARAM_INT);
+			strdata_pop(strdata, &procs[i].max_end_usec, PARAM_INT);
+			strdata_pop(strdata, &procs[i].mean_mops, PARAM_FLOAT);
+			strdata_pop(strdata, &procs[i].max_mops, PARAM_FLOAT);
+			strdata_pop(strdata, &procs[i].pe_id, PARAM_INT);
+			strdata_pop(strdata, &procs[i].core_id, PARAM_INT);
+			strdata_pop(strdata, &procs[i].nof_faults, PARAM_INT);
+			strdata_pop(strdata, &procs[i].C, PARAM_FLOAT);
+			strdata_pop(strdata, &procs[i].nof_itf, PARAM_INT);
+			for (j=0;j<procs[i].nof_itf;j++) {
+				strdata_pop(strdata, procs[i].itf[j].name, PARAM_STRING);
+				strdata_pop(strdata, &procs[i].itf[j].mode, PARAM_INT);
+				strdata_pop(strdata, procs[i].itf[j].remote_name, PARAM_STRING);
+				strdata_pop(strdata, procs[i].itf[j].remote_obj_name, PARAM_STRING);
+				strdata_pop(strdata, &procs[i].itf[j].xitf_id, PARAM_INT);
+				strdata_pop(strdata, &procs[i].itf[j].fifo_usage, PARAM_INT);
+				strdata_pop(strdata, &procs[i].itf[j].bpts, PARAM_INT);
+			}
+		}
+	}
+
+	if (do_print) {
+		if (n>0) {
+			proc_print(1, procs, n);
+		} else if (!n) {
+			printf("CMDMAN: Any proc available\n");
+		} else {
+			printf("CMDMAN: Error while listing procs (%d)\n", n);
+		}
+	}
+	
+	return n;
+}
+
+int _statset(char *x, int answer, strdata_o strdata, char do_print)
+{
+	int n;
+	int argc;
+	int value;
+        int type,phtype;
+
+	if (answer == PARAM_EXEC) {
+		argc = string_to_argv(x, argv, MAX_ARGS);
+		if (argc<4) {
+			return ERROR_PARAMS;
+		}
+
+		/** @TODO: Allow vectors in stats modification
+		 */
+                type = get_ptype(argv[3]);
+                if (type==-1) {
+                    printf("CMDMAN: Caution type not guessed. Trying with integer...\n");
+                    type = PARAM_INT;
+                }
+                switch(type) {
+                case PARAM_INT:
+                    phtype=STAT_TYPE_INT;
+                    break;
+                case PARAM_FLOAT:
+                    phtype=STAT_TYPE_FLOAT;
+                    break;
+                default:
+                    printf("CMDMAN: Error type %d not supported\n", type);
+                    return -1;
+                }
+		if (string_to_param(argv[3], &value, type)) {
+			return ERROR_PARAMS;
+		}
+		n = cmdman_statset(argv[0], argv[1], argv[2], &value, 1, phtype, 50);
+	} else {
+		n = answer;
+	}
+
+	if (do_print) {
+		if (n >= 0) {
+			printf("CMDMAN: Stat set ok.\n\n");
+		} else {
+			printf("CMDMAN: Error setting stat\n\n");
+		}
+	}	
+	return n;
+}
+
+int _statget(char *x, int answer, strdata_o strdata, char do_print)
+{
+	int n;
+	int i;
+	int argc;
+	int tstamp;
+	int type;
+	float *fdata=(float*) data;;
+	int *idata=(int*) data;
+        char *cdata= (char*) data;
+        short *sdata= (short*) data;
+
+	if (answer == PARAM_EXEC) {
+		argc = string_to_argv(x, argv, MAX_ARGS);
+		if (argc<3) {
+			return ERROR_PARAMS;
+		}
+		n = cmdman_statget(argv[0], argv[1], argv[2], (argc>3)?atoi(argv[3]):0, data, &type, &tstamp, MAX_DATA,15);
+                if (n<0) {
+                    return -1;
+                }
+		if (strdata) {
+			strdata_push(strdata, &tstamp, PARAM_INT);
+			strdata_push(strdata, &type, PARAM_INT);
+			switch(type) {
+			case STAT_TYPE_INT:
+				for (i=0;i<n;i++) {
+					strdata_push(strdata, &idata[i], PARAM_INT);
+				}
+				break;
+			case STAT_TYPE_FLOAT:
+				for (i=0;i<n;i++) {
+					strdata_push(strdata, &fdata[i], PARAM_FLOAT);
+				}
+				break;
+			case STAT_TYPE_SHORT:
+				for (i=0;i<n;i++) {
+					strdata_push(strdata, &sdata[i], PARAM_CHAR);
+				}
+				break;
+			case STAT_TYPE_CHAR:
+				for (i=0;i<n;i++) {
+					strdata_push(strdata, &cdata[i], PARAM_SHORT);
+				}
+				break;
+			default:
+				printf("Error reading type %d not supported\n",type);
+				return -1;
+			}
+		}
+	} else {
+		n = answer;
+                if (n<0) {
+                    return -1;
+                }
+		assert (strdata);
+		strdata_pop(strdata, &tstamp, PARAM_INT);
+		strdata_pop(strdata, &type, PARAM_INT);
+		switch(type) {
+		case STAT_TYPE_CHAR:
+			for (i=0;i<n;i++) {
+				strdata_pop(strdata, &cdata[i], PARAM_CHAR);
+			}
+			break;
+		case STAT_TYPE_SHORT:
+			for (i=0;i<n;i++) {
+				strdata_pop(strdata, &sdata[i], PARAM_SHORT);
+			}
+			break;
+		case STAT_TYPE_INT:
+			for (i=0;i<n;i++) {
+				strdata_pop(strdata, &idata[i], PARAM_INT);
+			}
+			break;
+		case STAT_TYPE_FLOAT:
+			for (i=0;i<n;i++) {
+				strdata_pop(strdata, &fdata[i], PARAM_FLOAT);
+			}
+			break;
+		default:
+			printf("Error receiving type %d not supported,n=%d\n",type,n);
+			return -1;
+		}
+	}
+
+	if (do_print) {
+		if (n>=0) {
+			printf("CMDMAN: Stat got ok at tstamp %d, %d values:\n\t",tstamp,n);
+			for (i=0;i<n;i++) {	
+				switch(type) {
+				case STAT_TYPE_CHAR:
+					printf("%d,",cdata[i]);
+					break;
+				case STAT_TYPE_SHORT:
+					printf("%d,",sdata[i]);
+					break;
+				case STAT_TYPE_INT:
+					printf("%d,",idata[i]);
+					break;
+				case STAT_TYPE_FLOAT:
+					printf("%f,",fdata[i]);
+					break;
+				default:
+					printf("Error type %d not supported\n",type);
+					return -1;
+				}
+			}
+			printf("\n");
+		} else {
+			printf("CMDMAN: Error while getting stat value (%d)\n", n);
+		}
+	}
+	
+	return n;
+}
+
+int _statreport(char *x, int answer, strdata_o strdata, char do_print)
+{
+	int n;
+	int argc;
+	int a;
+
+	if (answer == PARAM_EXEC) {
+		argc = string_to_argv(x, argv, MAX_ARGS);
+		if (argc<6) {
+			return ERROR_PARAMS;
+		}
+
+		if (!strncmp(argv[0],"start",10)) {
+			a=1;
+		} else if (!strncmp(argv[0],"stop",10)) {
+			a=0;
+		} else {
+			if (do_print) {
+				printf("\nCMDMAN: Error in command, first param must be start/stop\n");
+			}
+			return ERROR_PARAMS;
+		}
+		n = cmdman_statreport(argv[1], argv[2], argv[3],a,atoi(argv[4]),atoi(argv[5]),15);
+	} else {
+		n = answer;
+	}
+
+	if (do_print) {
+		if (n >= 0) {
+			printf("CMDMAN: Stats reports action ok.\n\n");
+		} else {
+			printf("CMDMAN: Error starting/stopping stat reports (%d)\n", n);
+		}
+	}	
+	return n;
+}
+
+int _loadapp(char *x, int answer, strdata_o strdata, char do_print)
+{
+	int n;
+	float g;
+	int argc;
+
+	if (answer == PARAM_EXEC) {
+		argc = string_to_argv(x, argv, MAX_ARGS);
+		if (argc<1) {
+			return ERROR_PARAMS;
+		}
+		if (argc==2) {
+			g=atof(argv[1]);
+		} else {
+			g=0.5;
+		}
+
+		n = cmdman_loadapp(argv[0], g, 50);
+	} else {
+		n = answer;
+	}
+
+	if (do_print) {
+		if (n >= 0) {
+			printf("\nCMDMAN: Waveform Loaded ok.\n");
+			printf("O============================================================================================O\n");
+		} else {
+			printf("\nCMDMAN: Error while loading Waveform (%d)\n", n);
+			printf("O============================================================================================O\n");
+		}
+	}	
+	return n;
+}
+
+int _runapp(char *x, int answer, strdata_o strdata, char do_print)
+{
+	int n;
+	int argc;
+	int nof_slots;
+
+	if (answer == PARAM_EXEC) {
+		argc = string_to_argv(x, argv, MAX_ARGS);
+		if (argc<1) {
+			return ERROR_PARAMS;
+		} else if (argc<2) {
+			nof_slots=0;
+		} else {
+			nof_slots=atoi(argv[1]);
+		}
+		n = cmdman_appstatus(x, PHAL_STATUS_RUN, 0, nof_slots, 50);
+	} else {
+		n = answer;
+	}
+
+	if (do_print) {
+		if (n >= 0) {
+			printf("CMDMAN: Waveform Running ok.\n\n");
+		} else {
+			printf("CMDMAN: Error while running Waveform (%d)\n", n);
+		}
+	}
+	return n;
+}
+
+int _initapp(char *x, int answer, strdata_o strdata, char do_print)
+{
+	int n;
+
+	if (answer == PARAM_EXEC) {
+		if (!*x) {
+			return ERROR_PARAMS;
+		}
+		n = cmdman_appstatus(x, PHAL_STATUS_INIT, 0, 0, 50);
+	} else {
+		n = answer;
+	}
+
+	if (do_print) {
+		if (n >= 0) {
+			printf("CMDMAN: Waveform Init ok.\n\n");
+		} else {
+			printf("CMDMAN: Error while initiating Waveform (%d)\n", n);
+		}
+	}	
+	return n;
+}
+
+int _pauseapp(char *x, int answer, strdata_o strdata, char do_print)
+{
+	int n;
+
+	if (answer == PARAM_EXEC) {
+		if (!*x) {
+			return ERROR_PARAMS;
+		}
+
+		n = cmdman_appstatus(x, PHAL_STATUS_PAUSE, 0, 0, 50);
+	} else {
+		n = answer;
+	}
+
+	if (do_print) {
+		if (n >= 0) {
+			printf("CMDMAN: Waveform Paused ok.\n\n");
+		} else {
+			printf("CMDMAN: Error while pausing Waveform (%d)\n", n);
+		}
+	}	
+	return n;
+}
+
+int _stepapp(char *x, int answer, strdata_o strdata, char do_print)
+{
+	int n;
+
+	if (answer == PARAM_EXEC) {
+		if (!*x) {
+			return ERROR_PARAMS;
+		}
+
+		n = cmdman_appstatus(x, PHAL_STATUS_STEP, 0, 0, 50);
+	} else {
+		n = answer;
+	}
+
+	if (do_print) {
+		if (n >= 0) {
+			printf("CMDMAN: Waveform Step ok.\n\n");
+		} else {
+			printf("CMDMAN: Error while stepping Waveform (%d)\n", n);
+		}
+	}	
+	return n;
+}
+
+int _stopapp(char *x, int answer, strdata_o strdata, char do_print)
+{
+	int n;
+
+	if (answer == PARAM_EXEC) {
+		if (!*x) {
+			return ERROR_PARAMS;
+		}
+
+		n = cmdman_appstatus(x, PHAL_STATUS_STOP, 0, 0, 50);
+	} else {
+		n = answer;
+	}
+
+	if (do_print) {
+		if (n >= 0) {
+			printf("CMDMAN: Waveform Stop ok.\n\n");
+		} else {
+			printf("CMDMAN: Error while stopping Waveform (%d)\n", n);
+		}
+	}	
+	return n;
+}
+

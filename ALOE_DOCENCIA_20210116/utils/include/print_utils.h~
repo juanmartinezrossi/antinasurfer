@@ -1,0 +1,92 @@
+/*
+ * print_utils.h
+ *
+ *
+ * This file is part of ALOE.
+ *
+ * ALOE is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * ALOE is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with ALOE.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+#ifndef _PRINT_UTILS
+#define _PRINT_UTILS
+
+//http://ascii-table.com/ansi-escape-sequences.php
+
+// Foreground Colors
+#define T_BLACK   		"\x1b[22;30m"
+#define T_RED     		"\x1b[22;31m"
+#define T_GREEN   		"\x1b[22;32m"
+#define T_BROWN  		"\x1b[22;33m"
+#define T_BLUE    		"\x1b[22;34m"
+#define T_MAGENTA 		"\x1b[22;35m"
+#define T_CYAN    		"\x1b[22;36m"
+#define T_GRAY			"\x1B[22;37m"
+
+#define T_DARKGRAY   	"\x1b[01;30m"
+#define T_LIGHTRED     	"\x1b[01;31m"
+#define T_LIGHTGREEN    "\x1b[01;32m"
+#define T_YELLOW  		"\x1b[01;33m"
+#define T_LIGHTBLUE  	"\x1b[01;34m"
+#define T_LIGHTMAGENTA  "\x1b[01;35m"
+#define T_LIGHTCYAN  	"\x1b[01;36m"
+#define T_WHITE			"\x1B[01;37m"
+
+// Background Colors
+#define B_BLACK   		"\x1b[40m"
+#define B_RED     		"\x1b[41m"
+#define B_GREEN   		"\x1b[42m"
+#define B_YELLOW  		"\x1b[43m"
+#define B_BLUE    		"\x1b[44m"
+#define B_MAGENTA 		"\x1b[45m"
+#define B_CYAN    		"\x1b[46m"
+#define B_WHITE			"\x1B[01;47m"
+
+
+// Text Attributes
+#define RESET   		"\x1b[0m"
+#define UNDERLINE    	"\033[4m"
+#define NO_UNDERLINE 	"\033[24m"
+#define BOLD         	"\033[1m"
+#define NO_BOLD 		"\033[22m"
+#define BLINK			"\033[5m"
+#define REVERSE			"\033[7m"
+#define CONCEALED		"\033[8m"
+
+// ACTIONS
+#define ERASE_DISPLAY	"\x1b[23"
+#define CLEAR()			printf("\033[H\033[J")
+#define gotoxy(x,y)		printf("\033[%d;%dH", (x), (y))
+
+/*
+In the linux terminal you may use terminal commands to move your cursor, such as
+
+printf("\033[8;5Hhello"); // Move to (8, 5) and output hello
+
+other similar commands:
+
+printf("\033[XA"); // Move up X lines;
+printf("\033[XB"); // Move down X lines;
+printf("\033[XC"); // Move right X column;
+printf("\033[XD"); // Move left X column;
+printf("\033[2J"); // Clear screen
+*/
+
+// Print data arrays 
+void print_cplx(char *name, _Complex float *in, int datalength, int rowlength);
+void print_float(char *name, float *in, int datalength, int rowlength);
+void print_int(char *name, int *in, int datalength, int rowlength);
+void print_char(char *name, char *in, int datalength, int rowlength);
+int print_array(char *name, char *datatype, void *in, int datalength, int rowlength);
+
+#endif /*  */

@@ -1,0 +1,171 @@
+/*
+ * mapper.c
+ *
+ * Copyright (c) 2009 Vuk Marojevic, UPC <marojevic at tsc.upc.edu>. All rights reserved.
+ *
+ *
+ * This file is part of ALOE.
+ *
+ * ALOE is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * ALOE is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with ALOE.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#include "mapper.h"
+#include "tw_mapping.h"
+
+
+// GLOBAL VARIABLES
+// actual number of processors and tasks
+int N;	// number of platform's processors
+int M;	// number of application's tasks/SDR functions/processes
+
+// resource models
+float P[Nmax];				// processing powers
+//float B[Nmax][Nmax];		// bandwidth resources
+float L[Nmax][Nmax];		// bandwidth resources (old model)
+int I[Nmax][Nmax];		// bandwidth resources
+float B[Nmax*Nmax];			// bandwidth resources
+
+// processing model
+float m_sort[Mmax];			// processing requirements sorted
+float b[Mmax][Mmax];		// data flow requirements
+
+// t-mapping
+float a_pathsU[Nmax+1][Nmax*Mmax];	// path costs
+int PP[Nmax][Mmax][Mmax];	// N*M matrix of Trellis nodes, each nodes contains the whole mapping up to this step
+
+// cost function
+float q1;
+float q2;
+
+//final mapping
+int mmap[Mmax];
+
+// architecture
+int arch;		// architecture indicator; arch = 0: FD, arch = 1: HD, arch = 2: Bus
+
+// multi-hop
+int mhop;		// multi-hop indicator; mhop = 0: single hops only, mhop = 1: 2-hop only if necessary, mhop = 2: single & 2-hops 
+
+/** IGM: Force idx vector
+ */
+int force_idx[Mmax];
+
+float mapper(struct preprocessing *preproc,
+           struct mapping_algorithm *algorithm,
+           struct cost_function *cfunction,
+           struct platform_resources *platform,
+           struct waveform_resources *waveform,
+           struct mapping_result *result)
+{
+
+	int i, j;		// loop indices
+	float cost;		// mapping cost
+	int default_W;
+
+	float m[Mmax];
+
+	// t-mapping: trellis organization
+	int nodes[Nmax][Mmax];		// 2D-array of N*M nodes that can be traspassed in the trellis
+	//int (*ptr_nodes)[Mmax];
+	int count;			// integer counter
+
+
+	/* primero compruebas que las variables de entrada sean correctas */
+ 	/*if (...) 
+		return -1;
+	*/
+
+	// COPIES
+	/* number of processors and tasks */
+	N = platform->nof_processors;	// number of platform's processors
+	M = waveform->nof_tasks;		// number of application's tasks/SDR functions/processes
+
+	// INITIALIZATIONS
+	//ptr_nodes = nodes;
+
+	// trellis organization: 'trellis nodes' (2D-array) numbered to be accessible by a single number or dimension
+	count = 0;
+	for (i=0; i<M; i++)
+		for (j=0; j<N; j++)
+			nodes[j][i] = count++;
+
+	/* cost function parameters */
+	q1 = cfunction->q;
+	q2 = (float)1-q1;
+	mhop = cfunction->mhop;
+
+	/* application and platform resources and parameters */
+	for (i=0; i<M; i++)
+		m[i] = waveform->c[i];
+
+	/** IGM: fill force idx vector */
+	for (i=0; i<M; i++)
+			force_idx[i] = waveform->force[i];
+
+	for (i=0; i<M; i++)
+		for (j=0; j<M; j++)
+			b[i][j] = waveform->b[i][j];
+
+	for (i=0; i<N; i++)
+		P[i] = platform->C[i];				
+
+	for (i=0; i<N; i++)
+		for (j=0; j<N; j++)
+			L[i][j] = platform->B[i][j];
+
+	arch = platform->arch;
+
+	resource_trans();
+
+	/* preprocessing */
+	switch (preproc->ord) {
+	case no_ord:
+		for (i=0; i<M; i++)
+			m_sort[i] = m[i];
+		break;
+	case c_ord:
+		sort_d(m);
+		break;
+	case b_ord:
+		sort_b(m);
+		break;
+	default:
+		for (i=0; i<M; i++)
+			m_sort[i] = m[i];
+	}
+	
+	//CHANGED AGB: 01/06/15
+	default_W=algorithm->w;
+	if(algorithm->w >= M){
+		if(M>1)algorithm->w=M-1;
+		else algorithm->w=M;
+	}
+	printf("O============================================================================================O\n");
+	printf("\t\033[1;32m Performing Mapping \033[0m\n");
+	printf("\t\033[1;32m Mapping carried out with t_w=%d, Default t_w=%d, number of task=%d\n", algorithm->w, default_W, M);
+	printf("\tWARNING!!!: t_w modified to avoid t_w value >= Number of task\033[0m\n");
+
+	cost = tw_mapping(nodes, algorithm->w);
+
+	for (i=0;i<M;i++) {
+		result->P_m[i]=mmap[i];
+	}
+//	printf("Amapper.c: cost=%3.1f\n", cost);
+	return cost;
+}	

@@ -1,0 +1,17 @@
+# PLOT
+#	 	0x0: Power calculation;						
+#		0x1: Variance calculation;
+
+parameter {
+	name = mode
+	value = 0
+}
+parameter {
+	name = gain
+	value = 1.0
+}
+parameter {
+	name = SNR
+	value = 0.0
+}
+

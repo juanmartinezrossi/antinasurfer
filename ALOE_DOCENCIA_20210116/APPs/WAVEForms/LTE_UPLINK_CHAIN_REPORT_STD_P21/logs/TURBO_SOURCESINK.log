@@ -1,0 +1,8 @@
+
+[000]:	Caution input interface control not connected
+
+[000]:	Caution input interface input_1 not connected
+
+[000]:	[info at file ../src/data_source_sink.c, line 107]: Parameter block_length is 360
+
+[000]:	[info at file ../src/data_source_sink.c, line 108]: Parameter block_length 

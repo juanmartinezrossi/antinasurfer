@@ -1,0 +1,6 @@
+
+[000]:	Caution input interface control not connected
+
+[000]:	[info at file ../src/fft_ifft.c, line 81]: Parameter block_length is 1024
+
+[000]:	[info at file ../src/fft_ifft.c, line 82]: Parameter block_length 

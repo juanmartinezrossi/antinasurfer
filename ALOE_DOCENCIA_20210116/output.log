@@ -1,0 +1,98 @@
+...........................................hwapi_backd.c==>setup_dac()
+hw_api_db->dac_itf=ÝB
+hwapi_backd_dac.c->configure_dac():DAC=soundcard, p_readcfg=4323824, p_init=4325488, p_close=4326720
+hwapi_backd_dac.c->configure_dac().fork:dac_pid=14595
+KERNEL:	Time slot duration set to 21333000 usec
+hwapi_backd_dac.c->configure_dac().fork:dac_pid=0
+hwapi_backd_dac.c->configure_dac().readcfg(OUTPUT)0=0
+sndcard_imp.c==>sndcard_readcfg()___________________________________________________CFG
+sndcard_imp.c==>sndcard_readcfg(): Read File:/usr/local/etc/dacsound.conf
+sndcard_imp.c==>sndcard_readcfg(): offset=140     CFG
+SOUND_CARD_TX: outputFreq=48000.0
+SOUND_CARD_TX: outputRFFreq=2400000000.0
+SOUND_CARD_TX: NsamplesOut=1024
+SOUND_CARD_TX: tx_gain=30.0
+SOUND_CARD_TX: tx_bw=0.0
+SOUND_CARD_RX: inputFreq=48000.0
+SOUND_CARD_RX: inputRFFreq=2400000000.0
+SOUND_CARD_RX: NsamplesIn=1024
+SOUND_CARD_RX: rx_gain=30.0
+SOUND_CARD_RX: rx_bw=0.0
+sndcard_imp.c==>sndcard_readcfg(): P0 RETURN=1
+hwapi_backd_dac.c->configure_dac().readcfg(OUTPUT)1=1
+sndcard_imp.c==>sndcard_init()_____________________________________________INIT
+NsamplesIn=1024, NsamplesOut=1024
+F-END:	I'm a local master.
+F-END:	Init ok
+NofSamples=1024
+engine sample rate: 48000
+WARNING; Required TimeSlot=21333 (us). Please, setup accordingly at hw_api/lnx/cfg/platform.conf
+EXEC:	Init ok
+BRIDGE:	External input itf 0x80 configured fd 5.
+BRIDGE:	Init ok
+SYNCMS:	Init ok
+STMAN:	Init ok
+STATS:	Init ok
+Error creating itf
+
+CMDMAN: Error initiating CMDMAN BACKEND
+HWMAN:	Init ok
+HWAPI_BACKD: Fatal error. Daemon cmdman died (pid 14594). Should exit...
+SWLOAD:	Init ok
+SWMAN:	Init ok
+processjack
+HWMAN:	Add processor: New CPU: PE 0x2, 5.973 MOPTS, BW 2133.3 MBPTS, 1 cores, TS=21333 us
+	-- C vector (in KOPTS) --
+	5973		
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+processjack
+CAUTION: Jack server shut down!!

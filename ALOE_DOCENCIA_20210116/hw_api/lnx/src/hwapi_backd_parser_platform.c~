@@ -1,0 +1,295 @@
+/*
+ * hwapi_backd_parser_platform.c
+ * hwapi_backd_parser.c
+ *
+ * Copyright (c) 2009 Ismael Gomez-Miguelez, UPC <ismael.gomez at tsc.upc.edu>
+ * All rights reserved.
+ *
+ *
+ * This file is part of ALOE.
+ *
+ * ALOE is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * ALOE is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with ALOE.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+
+
+/** System includes */
+#define _GNU_SOURCE
+#define _SVID_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
+#include <errno.h>
+#include <string.h>
+#include <sched.h>
+#include <time.h>
+#include <ctype.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/sem.h>
+#include <sys/msg.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/sem.h>
+#include <pthread.h>
+#include <sys/msg.h>
+
+
+/** HWAPI includes */
+#include "phal_hw_api.h"
+#include "hwapi_backd.h"
+#include "hwapi_netd.h"
+#include "params.h"
+
+#include "hwapi_backd_parser.h"
+
+extern int verbose;
+
+#include "dac_api.h"
+#include "dac_list.h"
+
+
+/***********************************************************
+ * 		FUNCTIONS TO PROCESS EACH SECTION
+ *
+ * 	Define sections and function pointers
+ * 		from hwapi_backd_parser.h
+ ***********************************************************/
+
+int parse_section_platform(Set_o keys, struct hw_api_db *hwapi, int idx) {
+	key_o key;
+	str_o value;
+
+
+//	printf("Parsing platform.conf\n");
+
+	/** Read platform name */
+	if ((key = Set_find(keys, "name", key_findname))) {
+		str_get(key->pvalue, hwapi->cpu_info.name, CPU_NAME_LEN);
+	} else {
+		printf("Platform name not found. Setting default.");
+		sprintf(hwapi->cpu_info.name, "CPU_NAME");
+	}
+
+	/** Read processor architecture */
+	if ((key = Set_find(keys, "arch", key_findname))) {
+		if (!str_scmp(key->pvalue,"x86")) {
+			hwapi->cpu_info.plat_family = PLATFORM_LIN_X86;
+		} else if (!str_scmp(key->pvalue,"x86_64")) {
+			hwapi->cpu_info.plat_family = PLATFORM_LIN_X86_64;
+		} else if (!str_scmp(key->pvalue,"arm")) {
+			hwapi->cpu_info.plat_family = PLATFORM_LIN_ARM;
+		} else if (!str_scmp(key->pvalue,"ppc")) {
+			hwapi->cpu_info.plat_family = PLATFORM_LIN_PPC;
+		} else {
+			printf("Unknown processor architecture %s\n",str_str(key->pvalue));
+			return 0;
+		}
+	} else {
+		printf("Platform architecture not found. Setting x86.");
+		hwapi->cpu_info.plat_family = PLATFORM_LIN_X86;
+	}
+
+	/** Read processor capacity */
+	if ((key = Set_find(keys, "mops", key_findname))) {
+		key_value(key,1,PARAM_FLOAT,&hwapi->cpu_info.C);
+	} else {
+		printf("Processor capacity not found.\n");
+		return 0;
+	}
+
+	/** Read processor bandwidth */
+	if ((key = Set_find(keys, "bw_mbps", key_findname))) {
+		key_value(key,1,PARAM_FLOAT,&hwapi->cpu_info.intBW);
+	} else {
+		hwapi->cpu_info.intBW=DEFAULT_INTERNAL_BW;
+	}
+
+	/** Read number of cores */
+	if ((key = Set_find(keys, "nof_cores", key_findname))) {
+		key_value(key,1,PARAM_INT,&hwapi->cpu_info.nof_cores);
+	} else {
+		printf("Processor number of cores not found.\n");
+		return 0;
+	}
+
+	/** Read number of cores */
+	if ((key = Set_find(keys, "tslot", key_findname))) {
+		key_value(key,1,PARAM_INT,&hwapi->cpu_info.tslen_usec);
+	} else {
+		printf("Time-slot length not found.\n");
+		return 0;
+	}
+
+	if ((key = Set_find(keys, "sync_drives_clock", key_findname))) {
+		key_value(key,1,PARAM_BOOLEAN,&hwapi->sync_drives_clock);
+	} else {
+		hwapi->sync_drives_clock=0;
+	}
+
+	/** Read run as daemon */
+	if ((key = Set_find(keys, "run_as_daemon", key_findname))) {
+		key_value(key,1,PARAM_BOOLEAN,&hwapi->run_as_daemon);
+	} else {
+		hwapi->run_as_daemon=0;
+	}
+
+	/** Read scheduling config file */
+	if ((key = Set_find(keys, "cfg_scheduling", key_findname))) {
+		printf("0__key->pvalue=%s\n", key->pvalue);
+		printf("0__hwapi->sched_cfg=%s\n", hwapi->sched_cfg);
+		str_get(key->pvalue, hwapi->sched_cfg, DEF_FILE_LEN);
+		printf("1__hwapi->sched_cfg=%s\n", hwapi->sched_cfg);
+	} else {
+		printf("Scheduling configuration file not found, setting to %s\n",DEFAULT_SCHED_FILE);
+		sprintf(hwapi->sched_cfg, DEFAULT_SCHED_FILE);
+		printf("0__hwapi->sched_cfg\n");
+	}
+
+	/** Read xitf config file */
+	if ((key = Set_find(keys, "cfg_xitf", key_findname))) {
+		str_get(key->pvalue, hwapi->xitf_cfg, DEF_FILE_LEN);
+	} else {
+		printf("Interfaces configuration file not found, setting to %s\n",DEFAULT_XITF_FILE);
+		sprintf(hwapi->xitf_cfg, DEFAULT_XITF_FILE);
+	}
+
+	return 1;
+}
+
+int parse_section_dac(Set_o keys, struct hw_api_db *hwapi, int idx) { //1
+	key_o key;
+	str_o value;
+	int j;
+
+
+//printf("parse_section_dac(): \n");
+
+	/** Read dac name */
+	if ((key = Set_find(keys, "name", key_findname))) { //
+//printf("key->value= %s\n", key->pvalue);		
+		if (!str_scmp(key->pvalue,"none")) {
+			hwapi->dac_itf=NULL;
+//printf("hwapi->dac_itf=NULL\n");
+		} else {
+			j=0;
+			while (j<4){
+//				printf("system_dacs[%d]=%s, key->pvalue=%s\n", j, system_dacs[j].name, key->pvalue);
+				j++;
+			}
+			j=0;
+			while (system_dacs[j].name!=NULL && str_scmp(key->pvalue,system_dacs[j].name)){
+//				printf("system_dacs[%d]=%s, key->pvalue=%s\n", j, system_dacs[j].name, key->pvalue);
+				j++;
+			}
+			if (system_dacs[j].name==NULL) {
+					printf("Unknown dac name %s. Check libraries in configure script.\n", str_str(key->pvalue));
+				return 0;
+			}
+
+//			printf("hwapi_backd_parser_platform.c->parse_section_dac(): j=%d\n", j);
+			hwapi->dac_itf = &system_dacs[j];
+//Print DAC pointer functions
+//			printf("USRPDACnumber_j=%d, name=%s, preadcfg=%u, pinit=%u, pclose=%u\n", 
+//								0, system_dacs[0].name, system_dacs[0].readcfg, system_dacs[0].init, system_dacs[0].close);
+//			printf("SOUNDDACnumber_j=%d, name=%s, preadcfg=%u, pinit=%u, pclose=%u\n", 
+//								1, system_dacs[1].name, system_dacs[1].readcfg, system_dacs[1].init, system_dacs[1].close);
+		}
+	} else {
+		printf("DAC name not specified. DAC won't be used.");
+		hwapi->dac_itf=NULL;
+	}
+
+	if ((key = Set_find(keys, "dac_drives_clock", key_findname))) {
+		key_value(key,1,PARAM_BOOLEAN,&hwapi->dac_drives_clock);
+	} else {
+		hwapi->dac_drives_clock=0;
+	}
+
+	/** Read DAC config name */
+	if ((key = Set_find(keys, "cfg_dac", key_findname))) {
+		str_get(key->pvalue,hwapi->dac.filename,DEF_FILE_LEN);
+	} else {
+		hwapi->run_as_daemon=0;
+	}
+	return 1;
+} //1
+
+int parse_section_other(Set_o keys, struct hw_api_db *hwapi, int idx) {
+	key_o key;
+	str_o value;
+	int j;
+
+	/** Read output filename */
+	if ((key = Set_find(keys, "output_file", key_findname))) {
+		str_get(key->pvalue,hwapi->output_file,DEF_FILE_LEN);
+	} else {
+		sprintf(hwapi->output_file,DEFAULT_OUTPUTLOG);
+	}
+
+	/** Read res dir */
+	if ((key = Set_find(keys, "work_path", key_findname))) {
+		str_get(key->pvalue,hwapi->res_path,DEF_FILE_LEN);
+	} else {
+		sprintf(hwapi->res_path,RESOURCE_DIR);
+	}
+
+	/** debugging parameters */
+	if ((key = Set_find(keys, "enable_stats", key_findname))) {
+		key_value(key,1,PARAM_BOOLEAN,&hwapi->cpu_info.enable_stats);
+		if (!hwapi->cpu_info.enable_stats)
+			printf("WARNING: Stats are disabled\n");
+	}
+	if ((key = Set_find(keys, "enable_logs", key_findname))) {
+		key_value(key,1,PARAM_BOOLEAN,&hwapi->cpu_info.enable_logs);
+		if (!hwapi->cpu_info.enable_logs)
+			printf("WARNING: Logs are disabled\n");
+	}
+	if ((key = Set_find(keys, "print_itf_pkt", key_findname))) {
+		key_value(key,1,PARAM_BOOLEAN,&hwapi->cpu_info.print_itf_pkt);
+	}
+	if ((key = Set_find(keys, "printbt_atrtfault", key_findname))) {
+		key_value(key,1,PARAM_BOOLEAN,&hwapi->cpu_info.print_rtfaults);
+	}
+	if ((key = Set_find(keys, "printbt_atexit", key_findname))) {
+		key_value(key,1,PARAM_BOOLEAN,&hwapi->printbt_atexit);
+	}
+	if ((key = Set_find(keys, "print_rtfaults", key_findname))) {
+		key_value(key,1,PARAM_BOOLEAN,&hwapi->cpu_info.print_rtfaults);
+	}
+	if ((key = Set_find(keys, "kill_rtfaults", key_findname))) {
+		key_value(key,1,PARAM_BOOLEAN,&hwapi->cpu_info.kill_rtfaults);
+	}
+	if ((key = Set_find(keys, "relinq_rtfaults", key_findname))) {
+		key_value(key,1,PARAM_BOOLEAN,&hwapi->cpu_info.relinq_rtfaults);
+	}
+	if ((key = Set_find(keys, "enable_fflush", key_findname))) {
+		key_value(key,1,PARAM_BOOLEAN,&hwapi->flushout);
+	}
+
+	return 1;
+}
+
+
+

@@ -1,0 +1,313 @@
+/* 
+ * Copyright (c) 2012.
+ * This file is part of ALOE (http://flexnets.upc.edu/)
+ * 
+ * ALOE++ is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ * 
+ * ALOE++ is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with ALOE++.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include <complex.h>
+#include <fftw3.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+#include <phal_sw_api.h>
+#include "skeleton.h"
+#include "params.h"
+
+#include "CHANNEL_ANALYZER_interfaces.h"
+#include "CHANNEL_ANALYZER_functions.h"
+#include "CHANNEL_ANALYZER.h"
+
+//ALOE Module Defined Parameters. Do not delete.
+char mname[STR_LEN]="CHANNEL_ANALYZER";
+int run_times=1;
+int block_length=1024;
+char plot_modeIN[STR_LEN]="DEFAULT";
+char plot_modeOUT[STR_LEN]="DEFAULT";
+float samplingfreqHz=1.0;
+int Tslot=0;
+
+//Module User Defined Parameters
+int pulselength=10;
+float gain=1.0;
+int opmode=0;			//0: Impulse, 1: Frequency Scanning
+float Afreq=50.0; 		// Scanning resolution in Hz
+int delay_value=0;
+int modephase=0; 		// 0: phase as output; 1: group delay as output
+
+//Global Variables
+_Complex float bufferA[2048];
+_Complex float pulse[2048*4];
+#define TABLESZ		48000
+_Complex float tableA[TABLESZ];
+float reffreq=1.0;
+float tonefreq=1024.0;
+float tonefreq2=1024.0;
+float MAXscanfreq;
+float threshold=0.01;
+float samplingfrec=48000.0;
+#define SPECTRUMSZ	2048*4
+_Complex float spectrum[SPECTRUMSZ];
+_Complex float zeroCX[SPECTRUMSZ];
+float CHGAINdB[SPECTRUMSZ];
+float CHPHASE[SPECTRUMSZ];
+float module[2048*4];
+float fase[2048*4];
+#define COSSAVESZ	32
+_Complex float gencos[COSSAVESZ][2048];
+_Complex float test[2048*4];
+_Complex float localcos[2048*4];
+int scaningTslots=0;
+int spectrum_length;
+
+/*char filtercoefffile[STR_LEN]="FIR.coeff";
+int filterlength=0;
+_Complex float COEFFs[2048];
+*/
+_Complex float buffer[2][2048*8];
+#define MAXTSDELAY	32
+_Complex float bufferC[MAXTSDELAY][2048*8];
+int readIdx=0, writeIdx=0;
+
+/*
+ * Function documentation
+ *
+ * @returns 0 on success, -1 on error
+ */
+int initialize() {
+
+	int j;
+
+	printf("INITIALIZEoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooP\n");
+	/* Get control parameters*/
+	param_get_int("block_length", &block_length);			//Initialized by hand or config file
+	param_get_int("run_times", &run_times);					//Initialized by hand or config file
+	param_get_string("plot_modeIN", &plot_modeIN[0]);		//Initialized by hand or config file
+	param_get_string("plot_modeOUT", &plot_modeOUT[0]);
+	param_get_float("samplingfreqHz", &samplingfreqHz);
+	param_get_int("pulselength", &pulselength);				//Initialized by hand or config file
+	param_get_float("gain", &gain);							//Initialized by hand or config file
+	param_get_int("opmode", &opmode);						//Initialized by hand or config file
+	param_get_float("threshold", &threshold);
+	param_get_float("freq_step", &Afreq);
+	param_get_float("modephase", &modephase);
+
+	/* Verify control parameters */
+
+	/* Print Module Init Parameters */
+	printf("O--------------------------------------------------------------------------------------------O\n");
+	printf("O    SPECIFIC PARAMETERS SETUP: \033[1;34m%s\033[0m\n", mname);
+	printf("O      Nof Inputs=%d, DataTypeIN=%s, Nof Outputs=%d, DataTypeOUT=%s\n", 
+		       NOF_INPUT_ITF, IN_TYPE, NOF_OUTPUT_ITF, OUT_TYPE);
+	printf("O      block_length=%d, run_times=%d, sampligfreqHz=%3.3f\n", block_length, run_times, samplingfreqHz);
+	printf("O      plot_modeIN=%s, plot_modeOUT=%s\n", plot_modeIN, plot_modeOUT);
+	printf("O      opmode=%d [0: Impulse, 1: Frequency Scanning], frequency_step=%3.1f Hz\n", opmode, Afreq);
+	printf("O      pulselength=%d, gain=%3.3f, threshold=%3.5f\n", pulselength, gain, threshold);
+	printf("O      modephase=%d [0: Phase in rad, 1: Group Delay in sec]\n", modephase);
+	printf("O--------------------------------------------------------------------------------------------O\n");
+
+	/* do some other initialization stuff */
+	init_pulse_COMPLEX(pulse, block_length, pulselength, gain);
+	/* Initialize sinus table function */
+	MAXscanfreq = samplingfrec/2;
+	scaningTslots=(int)(MAXscanfreq/Afreq);
+	spectrum_length=(int)(MAXscanfreq/Afreq);
+	init_toneCOMPLEX(tableA, TABLESZ, reffreq, gain, samplingfrec);
+	for(j=0; j<SPECTRUMSZ; j++){
+		spectrum[j]=-70.0+0.0i;
+		zeroCX[j]=0.0+0.0i;
+	}
+
+	printf("MAXscanfreq=%3.3f, scaningTslots=%d, spectrum_length=%d\n", MAXscanfreq, scaningTslots, spectrum_length);
+	return 0;
+}
+
+
+
+/**
+ * @brief Function documentation
+ *
+ * @param inp Input interface buffers. Data from other interfaces is stacked in the buffer.
+ * Use in(ptr,idx) to access the address. To obtain the number of received samples use the function
+ * int get_input_samples(int idx) where idx is the interface index.
+ *
+ * @param out Input interface buffers. Data to other interfaces must be stacked in the buffer.
+ * Use out(ptr,idx) to access the address.
+ *
+ * @return On success, returns a non-negative number indicating the output
+ * samples that should be transmitted through all output interface. To specify a different length
+ * for certain interface, use the function set_output_samples(int idx, int len)
+ * On error returns -1.
+ *
+ * @code
+ * 	input_t *first_interface = inp;
+	input_t *second_interface = in(inp,1);
+	output_t *first_output_interface = out;
+	output_t *second_output_interface = out(out,1);
+ *
+ */
+int work(input_t *inp, output_t *out) {
+
+	int i;
+	int snd_samples, rcv_samples = get_input_samples(0); 						/** number of samples at itf 0 buffer */
+
+	static int fase=0;
+	static int spectrumIdx=1;
+	float MAX=-1000000.0, MIN=1000000.0, CHphase=0.0, CHgaindB=0.0;
+	static int writeIdx=0, readIdx=0;
+	static int NewFreq=0;
+	static int firstfase1=0;
+	static int NOFTS=10;
+	_Complex float sentcos[2048*8];
+	_Complex float Csentcos[2048*8];
+	_Complex float myin[2048*8];
+	_Complex float aux[2048*8];
+	float phase2COUT[2048*8];
+
+	int LTslot;
+	static int first=0;
+	static int  saveFLAG=0, END=0;
+	
+	input_t *input0;
+	output_t *output0, *output1;
+	input0=inp;
+	output0=out;
+	output1=out(out,1);
+
+	// IMPULSE MODE
+	if(opmode==0){
+	/* Copy pulse buffer to output */
+		bypass_COMPLEX(pulse, block_length, output0);
+		/* Copy from input 0 to output 1*/
+		bypass_COMPLEX(input0, rcv_samples, output1);
+		// Calculate Processing chain Delay
+		delay(input0, block_length, threshold, Tslot, samplingfreqHz);
+		// Indicate the number of samples at output number N
+		//	set_output_samples(N, out_samples_at_N_port);
+		set_output_samples(1, rcv_samples);
+	}
+	// FREQUENCY SCANNING MODE
+	if(opmode==1){
+		// Get Delay in number of TSolts
+		if(fase == 0){
+			if(Tslot%2==0)bypass_COMPLEX(pulse, block_length, output0);
+			else bypass_COMPLEX(zeroCX, block_length, output0);
+			rcv_samples = get_input_samples(0);
+			delay_value=delay(input0, rcv_samples, threshold, Tslot, samplingfreqHz);
+			if(delay_value>0){
+				readIdx=-delay_value;
+				printf("SIGNAL DETECTED!!!!\n");
+				NOFTS=delay_value+2;
+				printf("NOFTS=%d\n", NOFTS);
+				NOFTS=NOFTS*2;
+				fase=1;		
+			}
+			else {
+				printf("SIGNAL NOT DETECTED!!!!\n");
+				printf("PLEASE, CHECK THE THRESHOLD PARAMETER -threshold- AND ADJUST ACORDINGLY IN CHANNEL_ANALYZER.params file\n");
+			}
+			CHGAINdB[0]=CHgaindB;
+			CHPHASE[0]=CHphase;
+		}
+
+		// Frequency Scan
+		if(fase==1){
+			if(firstfase1==0)Tslot=0;
+			firstfase1=1;
+			if(Tslot <= (scaningTslots+5)*NOFTS){
+				LTslot=Tslot%NOFTS;
+				if( LTslot == 0)NewFreq++;
+
+				// Calculate tone to send
+				tonefreq=(Afreq*(float)NewFreq);
+				// Send tone
+				gen_cosinus_REAL_COMPLEX(sentcos, tableA, TABLESZ, block_length, reffreq, tonefreq, samplingfrec);
+				// Sent cosinus: Only coswot
+				for(i=0; i<block_length; i++){
+					__real__ output0[i] =__real__ sentcos[i];
+					__imag__ output0[i] = 0.0;
+				}
+				// Receive samples from AD
+				rcv_samples = get_input_samples(0);
+				for(i=0; i<rcv_samples; i++)myin[i]=input0[i];
+				// Buffer Circular
+				// Save sent data
+				for(i=0; i<block_length; i++)bufferC[writeIdx][i]=sentcos[i];
+				writeIdx++;
+				if(writeIdx == MAXTSDELAY)writeIdx=0;
+				// Read sent data with delay=delay_value
+				if(readIdx >= 0)
+				for(i=0; i<block_length; i++)Csentcos[i]=bufferC[readIdx][i];
+				readIdx++;
+				if(readIdx == MAXTSDELAY)readIdx=0;				
+
+				if(LTslot == NOFTS-1){
+					// Calculate Channel Gain
+					CHgaindB = get_CH_gaindBs(myin, rcv_samples);
+					// Compute phase
+					if(modephase == 0)CHphase = get_CH_phase_radA(Csentcos, myin, block_length, aux);
+					if(modephase == 01)CHphase = get_CH_phase_radB(Csentcos, myin, block_length, aux);
+					if(LTslot==NOFTS-1)saveFLAG=1;
+				}
+				// SAVE GAIN AND PHASE
+				if(saveFLAG == 1){ 
+					CHGAINdB[spectrumIdx]=CHgaindB;
+					CHPHASE[spectrumIdx]=CHphase;
+					spectrumIdx++;
+					saveFLAG=0;
+					CHgaindB=0.0;
+					CHphase=0.0;
+				}
+				// Send to output
+				for(i=0; i<spectrum_length; i++){
+					__real__ output1[i]=CHGAINdB[i];
+					__imag__ output1[i]=CHPHASE[i];
+				}
+				// Indicate number of samples output 1
+				set_output_samples(1,  spectrum_length);
+
+			}else{
+				// CORRECT PHASE: Positive Slope and between -PI and PI
+				if(END==0){
+				// Calculate Group Delay
+					if(modephase == 1){
+						computeGroupDelay(CHPHASE, spectrum_length, CHGAINdB, Afreq);
+					}
+					END=1;
+				}
+				for(i=0; i<spectrum_length; i++){
+					__real__ output1[i]=CHGAINdB[i];
+					__imag__ output1[i]=CHPHASE[i];;
+				}
+			}
+		}
+	}
+	Tslot++;
+	// Indicate the number of samples at output 0 with return value
+	return block_length;
+}
+
+/** @brief Deallocates resources created during initialize().
+ * @return 0 on success -1 on error
+ */
+int stop() {
+	return 0;
+}
+
+
+
+
+

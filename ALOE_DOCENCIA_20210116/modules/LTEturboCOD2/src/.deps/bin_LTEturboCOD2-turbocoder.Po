@@ -1,0 +1,8 @@
+../src/bin_LTEturboCOD2-turbocoder.o: ../src/turbocoder.c \
+ /usr/include/stdc-predef.h ../src/turbocoder.h ../src/permute.h
+
+/usr/include/stdc-predef.h:
+
+../src/turbocoder.h:
+
+../src/permute.h:

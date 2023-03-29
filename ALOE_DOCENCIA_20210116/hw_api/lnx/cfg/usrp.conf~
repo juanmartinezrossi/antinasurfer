@@ -1,0 +1,37 @@
+
+main {
+	#address_not_used
+	address=192.168.10.2
+	#"addr0=192.168.10.2"
+	
+	#internal,external
+	clock=internal 
+	
+	# Indicates which flow governs the time-slot
+	sync_on=tx
+	
+	# Only half-duplex is supported: 0: none active, 1:tx, 2:rx, 3:txrx
+	chain=1
+}
+
+# value=0 set to default
+tx {
+	samp_freq=1923077
+	freq=2410001408		2410001500.0
+	#2419999872
+	gain=1.0	
+	bw=1.0
+	blocksize=1920
+}
+
+# value=0 set to default
+rx {
+	samp_freq=1923077
+	freq=2410001408
+	gain=1.0
+	bw=1.0
+	blocksize=1920
+}
+
+
+	

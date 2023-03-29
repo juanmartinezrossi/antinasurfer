@@ -1,0 +1,53 @@
+Hi again
+Thank you very much, we expect our thesis will be available from some
+time
+next year, we will add it to the academic section.
+
+The work we have done so far have pointed us to the daughterboard mixer.
+All mixers have problems causing harmonics, and our research so far has
+shown us that this is the big problem.
+The work with gain adjusting the I Q channels in the drivers give us an
+idea we might be right ;)
+
+We have spent a good while describing what frequencies the osclilator on
+the daughterboard can supply.
+When in auto mode, the UHD driver will try to select a frequency that is
+offset, so that an actual direct up/down conversion does not take place.
+This is what is normally known as the "Superheterodyne radio". However,
+because of the division of labour between the mixer in the FPGA and the
+mixer on the daughterboard, the IF frequency selected is often too close
+to
+the daughterboard mixer frequency.
+
+This results in quite a bit of nasty spikes around the desired signal.
+There are two ways of testing this:
+1: the "scientific")
+Try sending out a single frequency, a flowgraph of [complex cosine] ->
+[UHD
+Sink] was good enough for us.
+Check out what spurious frequencies are created. You will typically see
+the
+wanted signal (f_c +/- f_s), a bit of the _actual_ carrier (f_c) and
+mirrors of different description. (eg f_c +/- 2*f_s ; f_c -/+ f_s).
+Increasing the signal frequency(f_s) will reveal which is the
+oscilator(f_c) and which is the mirror.
+
+Page 19 of the AD8349 (mixer for the RFX2400) showed part of this
+explanation.
+
+2: the "mechanics version")
+Try other frequencies, maybe you will get lucky ;)
+
+One other method might be to write all or parts of the application in
+C++,
+that way you should be able to select a mixer frequency far away from
+the
+one you need (the N210 FPGA mixer can provide +/- 50MHz offset, i
+believe
+the USRP1 can supply +/- 32MHz).
+This way you should be able to reduce the spurious emissions.
+
+The problem using this approach is that you will send the spurious
+emissions into other parts of the band (the problem with having a narrow
+signal in a wide-band application).
+

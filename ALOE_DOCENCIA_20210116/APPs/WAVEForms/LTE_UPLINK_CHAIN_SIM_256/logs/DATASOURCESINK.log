@@ -1,0 +1,10 @@
+
+[000]:	Caution input interface control not connected
+
+[000]:	Caution input interface input_2 not connected
+
+[000]:	Caution output interface output_2 not connected
+
+[000]:	[info at file ../src/DATASOURCESINK_REPORTP21.c, line 118]: Parameter block_length is 360
+
+[000]:	[info at file ../src/DATASOURCESINK_REPORTP21.c, line 119]: Parameter block_length 

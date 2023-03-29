@@ -1,0 +1,290 @@
+/** ALOE headers
+ */
+#include <phal_sw_api.h>
+#include <math.h>
+#include <complex.h>
+#include <sys/time.h>
+#include <swapi_utils.h>
+#include <phal_hw_api.h>
+
+#include "itf_types.h"
+#include "inputs.h"
+#include "outputs.h"
+#include "dac_cfg.h"
+#include "stats.h"
+
+
+
+#define TABLE_SIZE   (200)
+typedef struct{
+    float sine[TABLE_SIZE];
+    int left_phase;
+    int right_phase;
+}paTestData;
+paTestData data;
+
+void sintableAD();
+void test0(_Complex float *out1, int nframes);
+int init_toneCOMPLEX(_Complex float *table, int length, float gain, float sampl_freq);
+int gen_toneCOMPLEX(_Complex float *func_out, _Complex float *tablel, int tablesz, 
+					int datalen, float tone_freq, float sampl_freq);
+
+#define TABLESZ		32768	//262144
+#define PIx2 6.283185307
+_Complex float tableA[TABLESZ];
+
+void *out_DAC, *in_DAC;
+int dac_type;
+
+struct timeval tv0, tv1;
+
+
+void CloseObject();
+
+int RunCustom()
+{
+    int i;
+    _Complex float *outTX_cf,*inTX_cf, *outRX_cf,*inRX_cf;
+	static int Tslot=0;
+
+/*	gettimeofday(&tv0, NULL);
+	printf("JACK0diff_time=%ld\n", (tv0.tv_sec-tv1.tv_sec)*1000000+(tv0.tv_usec-tv1.tv_usec));
+	tv1.tv_sec=tv0.tv_sec;
+	tv1.tv_usec=tv0.tv_usec;
+*/	
+//	printf("DAC_JACK0: Tslot=%d\n", Tslot);
+
+	//RX SIDE
+	outRX_cf=(_Complex float*) output_data;
+    inRX_cf=(_Complex float*) in_DAC;
+	if(op_mode==OPMODE_RX || op_mode==OPMODE_RXTX){
+		for (i=0;i<NsamplesOut;i++) {
+    		outRX_cf[i]=inRX_cf[i]*rx_gain;
+//			__real__ outRX_cf[i]=__real__ inRX_cf[i]*rx_gain;
+//			__imag outRX_cf[i]=	0.0; //inRX_cf[i]*rx_gain;
+		}
+	}
+	//TX SIDE
+	outTX_cf=(_Complex float*) out_DAC;
+    inTX_cf=(_Complex float*) input_data;
+	if(op_mode==OPMODE_TEST0)test0(outTX_cf, NsamplesIn);
+	if(op_mode==OPMODE_TEST1)gen_toneCOMPLEX(outTX_cf, tableA, TABLESZ,  NsamplesIn, 40000.0, 1920000.0);;
+	if(op_mode==OPMODE_BYPASS)for (i=0;i<NsamplesIn;i++)outTX_cf[i]=inRX_cf[i];
+	if(op_mode==OPMODE_TX || op_mode==OPMODE_RXTX){
+		for (i=0;i<NsamplesIn;i++) {
+    		outTX_cf[i]=inTX_cf[i]*tx_gain;
+			//__real__ outTX_cf[i]=(__real__ inTX_cf[i])*tx_gain;
+			//__imag__ outTX_cf[i]=0.0; //inTX_cf[i]*tx_gain;
+		}
+	}
+
+	/* Send data throught the output interface */
+    SendItf(0,NsamplesOut);
+	Tslot++;
+    return 1;
+}
+
+int process_input(int len)
+{
+	NsamplesIn=len;
+    return 1;
+}
+int process_output(int len)
+{
+	NsamplesOut=len;
+    return 1;
+}
+int process_control(int len)
+{
+	double freq = (double) ctrl_pkt.freq;
+
+	/** Set DAC output sampling frequency */
+    /** clock is only changed by DAC driver if detects a change */
+//	hwapi_dac_setOutputFreq((double) freq);
+
+    /** Set DAC output block length */
+ //   hwapi_dac_setOutputLen(ctrl_pkt.nsamples);
+
+    Log("DAC: Setting freq to %.2f MHz. Sending %d samples to DAC.\n",freq/1000000,ctrl_pkt.nsamples);
+
+    return 1;
+}
+int InitCustom(){
+
+	_Complex float dd=1.2+3.4i;
+	_Complex float *pd;
+
+	/* Generate sin table for testing */
+	sintableAD();	//TEST 0
+//	printf("DAC_JACK0.InitCustom(): ctrl_pkt.freq=%3.2f\n", ctrl_pkt.freq);
+	init_toneCOMPLEX(tableA, TABLESZ, 0.25, 1923077.0);	//TEST 1
+	
+	/* Register closing function */
+	AtClose(CloseObject);
+
+//	printf("HAVE_UHD=%d\n", HAVE_UHD);
+//	printf("HAVE_JACK=%d\n", HAVE_JACK);
+
+	dac_type = hwapi_dac_getSampleType();
+	if(dac_type == DAC_SAMPLE_COMPLEXFLOAT)printf("COMPLEX_FLOAT AUDIO DAC\n");
+		//printf("DAC_JACK0.c==>InitCustom():dac_type=COMPLEX_FLOAT\n");
+
+	/* Get output buffer to DA*/
+    out_DAC=hwapi_dac_getOutputBuffer(0);
+
+/*	memcpy(out_DAC, &dd, sizeof(_Complex float));
+	pd=out_DAC;
+	printf("R %3.2f\n", __real__ *pd);
+*/
+//	printf("XXX______________________________________________________________ out_DAC pointer=0x%.12X\n", out_DAC);
+    if (!out_DAC) {
+        Log("Error getting dac output buffer\n");
+        return 0;
+    }
+	/* Get input buffer from AD*/
+	in_DAC=hwapi_dac_getInputBuffer(0);
+//	printf("XXX______________________________________________________________ in_DAC pointer=0x%.12X\n", in_DAC);
+    if (!in_DAC) {
+        Log("Error getting dac intput buffer\n");
+        return 0;
+    }
+	if(op_mode==OPMODE_TX)printf("DAC operation mode = TX only\n");
+	if(op_mode==OPMODE_RX)printf("DAC operation mode = RX only\n");
+	if(op_mode==OPMODE_RXTX)printf("DAC operation mode = Full Duplex\n");
+	if(op_mode==OPMODE_TEST0)printf("DAC operation mode = Sent tones\n");
+	if(op_mode==OPMODE_TEST1)printf("DAC operation mode = Send quality tone\n");
+	if(op_mode==OPMODE_BYPASS)printf("DAC operation mode = Bypass RX to TX\n");
+
+
+	printf("O--------------------------------------------------------------------------------------------O\n");
+	printf("O SPECIFIC PARAMETERS SETUP MODULE: DAC_JACK0\n");
+	printf("O  Operating Mode(op_mode)=%d\n", op_mode);
+	printf("O  Operation Mode: 0=TX, 1=RX, 2=RX&TX, 3=TEST0 (TX generated signal), 4=TEST1 (Quality Tone), 5=BYPASS (ECHO effect)\n");
+	printf("O  SampleType=%d\n", sampleType);
+	printf("O  Transmitter\n");
+	printf("O  TX_samplesIn=%d, TX_gain=%3.2f\n",NsamplesIn,  tx_gain);
+	printf("O  Receiver\n");
+	printf("O  RX_samplesIn=%d, RX_gain=%3.2f\n",NsamplesOut, rx_gain);
+	printf("O--------------------------------------------------------------------------------------------O\n");
+	
+/*	printf("op_mode=%d, inputFreq=%3.1f, outputFreq=%3.1f\n", op_mode, inputFreq, outputFreq);
+	printf("inputRFFreq=%3.1f, outputFreq=%3.1f\n", inputRFFreq, outputRFFreq);
+	printf("sampleType=%d, nof_channels=%d\n", sampleType, nof_channels);
+	printf("NsamplesIn=%d, NsamplesOut=%d\n", NsamplesIn, NsamplesOut);
+*/
+
+/*#ifdef kk
+    if (tx_samp)
+    	hwapi_dac_setOutputFreq((double) tx_samp);
+#endif*/
+    return 1;
+}
+
+
+void ConfigInterfaces(){}
+
+void CloseObject() {
+	if (out_DAC) {
+		memset(out_DAC,0,hwapi_dac_getMaxOutputLen());
+	}
+	if (in_DAC) {
+		memset(in_DAC,0,hwapi_dac_getMaxInputLen());
+	}
+}
+
+
+/* Additional functions ///////////////////////////////////////////////////////*/
+
+//TEST 0
+void sintableAD(){
+	int i;
+	for( i=0; i<TABLE_SIZE; i++ )
+    {
+        data.sine[i] = 0.01 * (float) sin( ((double)i/(double)TABLE_SIZE) * M_PI * 2. );
+    }
+}
+
+
+/*
+ * Generate different and alternated tones to left and right outputs.
+ */
+
+#define MAXJ1	100
+void test0(_Complex float *out1, int nframes){
+int i;
+	static int j=0, k=0;
+
+	for( i=0; i<nframes; i++ ){
+        if(j>MAXJ1/2){
+			__real__ out1[i] = data.sine[data.left_phase];  
+			__imag__ out1[i] = 0;
+		}
+		else {
+			__real__ out1[i] = 0;
+        	__imag__ out1[i] = data.sine[data.right_phase];  
+		}
+		data.left_phase += (k+3);
+		if( data.left_phase >= TABLE_SIZE ) data.left_phase -= TABLE_SIZE;
+		data.right_phase += (k+5); 
+		if( data.right_phase >= TABLE_SIZE ) data.right_phase -= TABLE_SIZE;
+    }
+	j++;
+	if(j>=MAXJ1){
+		j=0;
+		k = (k+1);
+		if(k>=10)k=0;
+	}
+}
+
+
+// TEST 1
+
+int init_toneCOMPLEX(_Complex float *table, int length, float gain, float sampl_freq){
+	int i;
+	double arg=PIx2/((float)length);
+
+	for (i=0;i<length;i++) {
+		__real__ table[i]=gain*(float)cos(arg*(float)i);
+		__imag__ table[i]=gain*(float)sin(arg*(float)i);
+	}
+	return(1);
+}
+
+int gen_toneCOMPLEX(_Complex float *func_out, _Complex float *tablel, int tablesz, 
+					int datalen, float tone_freq, float sampl_freq){
+	int i;
+	static int j=0, k=0;
+	static float ref_freq_c;
+
+	if(j==0){
+		ref_freq_c=sampl_freq/(float)tablesz;
+		k=(int)(tone_freq*2/ref_freq_c);
+//		printf("ref_freq_c=%3.1f, k=%d\n", ref_freq_c, k);
+	}
+	for (i=0;i<datalen;i++) {
+		func_out[i] = tx_gain*tablel[j];
+		__real__ func_out[i] = (__real__ func_out[i]);
+		__imag__ func_out[i] = (__imag__ func_out[i]);
+		j += k;
+		if(j>=tablesz)j-=tablesz;
+	}
+	return(1);
+}
+
+void timeval_subtract (struct timeval *result, struct timeval *init, struct timeval *end){
+
+	//int nsec;
+
+
+	if(init->tv_sec == end->tv_sec){
+		result->tv_sec = 0;
+		result->tv_usec = end->tv_usec-init->tv_usec;
+	}
+
+	if(init->tv_sec < end->tv_sec){
+		result->tv_sec = end->tv_sec - 1 -init->tv_sec;
+		result->tv_usec = end->tv_usec + 1000000 - init->tv_usec;
+	}
+ }
+
+

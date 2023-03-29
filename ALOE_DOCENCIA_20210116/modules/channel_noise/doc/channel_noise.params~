@@ -1,0 +1,42 @@
+# PLOT
+#	 	0x0: Power calculation;						
+#		0x1: Variance calculation;
+
+parameter {
+	name = mode
+	value = 0
+}
+
+parameter {
+	name = numsampl2view
+	value = 2048
+}
+
+parameter {
+	name = samplingfreqHz
+	value = 48000.0
+}
+
+parameter {
+	name = fftsize
+	value = 2048
+}
+
+# AVERAGEDFFT: 0=Non Averaged; 1: Averaged
+
+parameter {
+	name = averagefft
+	value = 0
+}
+
+# Persistence of history in average
+parameter {
+	name = mu
+	value = 0.8
+}
+
+# LOGSCALE: dB Scale for FFT plotting: 0=Linear Scale; 1=dB Scale
+parameter {
+	name = logscale
+	value = 1
+}
